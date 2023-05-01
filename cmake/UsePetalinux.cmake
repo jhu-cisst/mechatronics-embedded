@@ -37,6 +37,7 @@
 #   - CONFIG_SRC_DIR     Source directory for config files
 #   - APP_TEMPLATE       Application template (c, c++, autoconf, fpgamanager, install)
 #   - APP_SOURCES        List of source files
+#   - APP_BBAPPEND       Application bbappend file (optional)
 #
 # Description:
 #   This function creates the application and then overwrites it with the specified
@@ -213,7 +214,8 @@ function (petalinux_app_create ...)
        PROJ_NAME
        CONFIG_SRC_DIR
        APP_TEMPLATE
-       APP_SOURCES)
+       APP_SOURCES
+       APP_BBAPPEND)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -236,15 +238,16 @@ function (petalinux_app_create ...)
 
     if (APP_TEMPLATE STREQUAL "fpgamanager")
       # For fpgamanager, files are in recipes-firmware and it is assumed that APP_SOURCES specifies just one file (the BIT file),
-      # which is copied and renamed to system.bit
-      set (APP_FILES_BIN     "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-firmware/${APP_NAME}/files/system.bit")
-      set (APP_CREATE_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-firmware/${APP_NAME}/${APP_NAME}.bb")
+      # which is copied and renamed to system.bit. This feature ("fpgamanager" template) is not currently used.
+      set (APP_BIN           "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-firmware/${APP_NAME}")
+      set (APP_FILES_BIN     "${APP_BIN}/files/system.bit")
     else (APP_TEMPLATE STREQUAL "fpgamanager")
       # For all other apps, files are in recipes-apps. In this case APP_SOURCES can specify more than one file, though further
       # updates may be necessary to support this (e.g., via .bbappend)
-      set (APP_FILES_BIN     "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-apps/${APP_NAME}/files")
-      set (APP_CREATE_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-apps/${APP_NAME}/${APP_NAME}.bb")
+      set (APP_BIN           "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-apps/${APP_NAME}")
+      set (APP_FILES_BIN     "${APP_BIN}/files")
     endif (APP_TEMPLATE STREQUAL "fpgamanager")
+    set (APP_CREATE_OUTPUT "${APP_BIN}/${APP_NAME}.bb")
 
     set (ROOTFS_CONFIG     "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs/rootfs_config")
     set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
@@ -270,8 +273,28 @@ function (petalinux_app_create ...)
         COMMENT "Creating ${APP_NAME}"
         DEPENDS ${APP_SOURCES})
 
-    add_custom_target(${APP_NAME} ALL
-                      DEPENDS ${APP_CREATE_OUTPUT})
+    if (APP_BBAPPEND)
+
+      set (APP_BBAPPEND_OUTPUT "${APP_BIN}/${APP_BBAPPEND}")
+      add_custom_command (
+          OUTPUT ${APP_BBAPPEND_OUTPUT}
+          # Copy the source files
+          COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${APP_BBAPPEND}
+                  ${APP_BIN}
+          COMMENT "Copying ${APP_BBAPPEND} to build tree"
+          DEPENDS ${APP_CREATE_OUTPUT} ${APP_BBAPPEND})
+
+      add_custom_target(${APP_NAME} ALL
+                        DEPENDS ${APP_BBAPPEND_OUTPUT})
+
+    else (APP_BBAPPEND)
+
+      add_custom_target(${APP_NAME} ALL
+                        DEPENDS ${APP_CREATE_OUTPUT})
+
+    endif (APP_BBAPPEND)
 
   else (PROJ_NAME AND APP_NAME AND CONFIG_SRC_DIR AND APP_SOURCES)
 

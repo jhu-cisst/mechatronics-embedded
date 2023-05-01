@@ -283,5 +283,6 @@ int main(int argc, char **argv)
         ProgramFpga(FirmwareName[board_type]);
     }
 
+    printf("*** FPGAV3 Initialization Complete ***\n\n");
     return 0;
 }

@@ -17,12 +17,16 @@ petalinux_create(PROJ_NAME          "fpgav3"
                  CONFIG_SRC_DIR     ${PETALINUX_CONFIG_DIR}
                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE})
 
-set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.c")
+set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.c"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.service")
+
+set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbappend")
 
 petalinux_app_create(APP_NAME       "fpgav3init"
                      PROJ_NAME      "fpgav3"
                      CONFIG_SRC_DIR ${PETALINUX_CONFIG_DIR}
-                     APP_SOURCES    ${FPGAV3INIT_SOURCES})
+                     APP_SOURCES    ${FPGAV3INIT_SOURCES}
+		     APP_BBAPPEND   ${FPGAV3INIT_BBAPPEND})
 
 set (PETALINUX_BUILD_DEPS ${PETALINUX_CONFIG_FILES} ${PETALINUX_DEVICE_TREE} ${FPGAV3INIT_SOURCES} "fpgav3init")
 

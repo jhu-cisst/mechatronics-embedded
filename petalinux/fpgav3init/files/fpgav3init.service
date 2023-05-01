@@ -1,0 +1,9 @@
+[Unit]
+Description=fpgav3init
+ 
+[Service]
+ExecStart=/usr/bin/fpgav3init
+StandardOutput=journal+console
+ 
+[Install]
+WantedBy=multi-user.target
