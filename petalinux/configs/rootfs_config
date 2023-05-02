@@ -3893,7 +3893,6 @@ CONFIG_Init-manager-sysvinit=y
 # apps 
 #
 CONFIG_fpgav3init=y
-# CONFIG_fpgav3ld is not set
 
 #
 # user packages 
@@ -3907,4 +3906,4 @@ CONFIG_gpio-demo=y
 CONFIG_ADD_EXTRA_USERS="root:dvrk;petalinux:;dvrk:;"
 CONFIG_CREATE_NEW_GROUPS="aie;"
 CONFIG_ADD_USERS_TO_GROUPS="petalinux:audio,video,aie;"
-CONFIG_ADD_USERS_TO_SUDOERS="petalinux;dvrk"
+CONFIG_ADD_USERS_TO_SUDOERS="petalinux;dvrk;"
