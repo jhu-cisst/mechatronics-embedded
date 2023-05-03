@@ -32,5 +32,7 @@ set (PETALINUX_BUILD_DEPS ${PETALINUX_CONFIG_FILES} ${PETALINUX_DEVICE_TREE} ${F
 
 petalinux_build(TARGET_NAME         "fpgav3_build"
                 PROJ_NAME           "fpgav3"
+                CONFIG_MENU         ${PETALINUX_MENU}
+                CONFIG_SRC_DIR      ${PETALINUX_CONFIG_DIR}
                 BIT_FILE            ${BIT_FILE}
                 DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
