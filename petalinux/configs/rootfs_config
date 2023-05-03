@@ -3906,4 +3906,4 @@ CONFIG_gpio-demo=y
 CONFIG_ADD_EXTRA_USERS="root:dvrk;petalinux:;dvrk:;"
 CONFIG_CREATE_NEW_GROUPS="aie;"
 CONFIG_ADD_USERS_TO_GROUPS="petalinux:audio,video,aie;"
-CONFIG_ADD_USERS_TO_SUDOERS="petalinux;dvrk;"
+CONFIG_ADD_USERS_TO_SUDOERS="petalinux dvrk"
