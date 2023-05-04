@@ -34,7 +34,6 @@
 # Parameters:
 #   - APP_NAME           Application name (also used as CMake target name)
 #   - PROJ_NAME          Project name
-#   - CONFIG_SRC_DIR     Source directory for config files
 #   - APP_TEMPLATE       Application template (c, c++, autoconf, fpgamanager, install)
 #   - APP_SOURCES        List of source files
 #   - APP_BBAPPEND       Application bbappend file (optional)
@@ -198,7 +197,6 @@ function (petalinux_app_create ...)
   set (FUNCTION_KEYWORDS
        APP_NAME
        PROJ_NAME
-       CONFIG_SRC_DIR
        APP_TEMPLATE
        APP_SOURCES
        APP_BBAPPEND)
@@ -220,7 +218,7 @@ function (petalinux_app_create ...)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (PROJ_NAME AND APP_NAME AND CONFIG_SRC_DIR AND APP_SOURCES)
+  if (PROJ_NAME AND APP_NAME AND APP_SOURCES)
 
     if (APP_TEMPLATE STREQUAL "fpgamanager")
       # For fpgamanager, files are in recipes-firmware and it is assumed that APP_SOURCES specifies just one file (the BIT file),
@@ -277,11 +275,11 @@ function (petalinux_app_create ...)
 
     endif (APP_BBAPPEND)
 
-  else (PROJ_NAME AND APP_NAME AND CONFIG_SRC_DIR AND APP_SOURCES)
+  else (PROJ_NAME AND APP_NAME AND APP_SOURCES)
 
     message (SEND_ERROR "petalinux_app_create: required parameter missing")
 
-  endif (PROJ_NAME AND APP_NAME AND CONFIG_SRC_DIR AND APP_SOURCES)
+  endif (PROJ_NAME AND APP_NAME AND APP_SOURCES)
 
 endfunction (petalinux_app_create)
 

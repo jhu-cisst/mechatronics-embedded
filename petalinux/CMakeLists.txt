@@ -24,9 +24,8 @@ set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbap
 
 petalinux_app_create(APP_NAME       "fpgav3init"
                      PROJ_NAME      "fpgav3"
-                     CONFIG_SRC_DIR ${PETALINUX_CONFIG_DIR}
                      APP_SOURCES    ${FPGAV3INIT_SOURCES}
-		     APP_BBAPPEND   ${FPGAV3INIT_BBAPPEND})
+                     APP_BBAPPEND   ${FPGAV3INIT_BBAPPEND})
 
 set (PETALINUX_BUILD_DEPS ${PETALINUX_CONFIG_FILES} ${PETALINUX_DEVICE_TREE} ${FPGAV3INIT_SOURCES} "fpgav3init")
 
