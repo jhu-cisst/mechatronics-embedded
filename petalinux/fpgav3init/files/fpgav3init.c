@@ -15,6 +15,11 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/if_arp.h>
+#include <arpa/inet.h>
 
 // Some hard-coded values
 const unsigned int GPIO_BASE = 906;
@@ -225,6 +230,37 @@ bool ProgramFpga(const char *firmwareName)
     return FpgaLoad(binFile);
 }
 
+// Set MAC and IP addresses for specified Ethernet adapter
+bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id)
+{
+    struct ifreq ifr;
+
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd == -1)
+        return false;
+
+    // Set MAC address
+    // The first 3 bytes are the JHU LCSR CID
+    strcpy(ifr.ifr_name, ethName);
+    ifr.ifr_hwaddr.sa_data[0] = 0xFA;
+    ifr.ifr_hwaddr.sa_data[1] = 0x61;
+    ifr.ifr_hwaddr.sa_data[2] = 0x0E;
+    ifr.ifr_hwaddr.sa_data[3] = 0x00;
+    ifr.ifr_hwaddr.sa_data[4] = ethNum;
+    ifr.ifr_hwaddr.sa_data[5] = board_id;
+    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+    if (ioctl(sockfd, SIOCSIFHWADDR, &ifr) == -1)
+        return false;
+
+    // Set IP address
+    char ip_addr[16];
+    sprintf(ip_addr, "192.168.%d.%d", (10+ethNum), board_id);
+    ifr.ifr_addr.sa_family = AF_INET;
+    struct sockaddr_in* addr = (struct sockaddr_in*)&ifr.ifr_addr;
+    inet_pton(AF_INET, ip_addr, &addr->sin_addr);
+    return (ioctl(sockfd, SIOCSIFADDR, &ifr) != -1);
+}
+
 int main(int argc, char **argv)
 {
     printf("*** FPGAV3 Initialization ***\n\n");
@@ -282,6 +318,12 @@ int main(int argc, char **argv)
     if (strlen(FirmwareName[board_type]) > 0) {
         ProgramFpga(FirmwareName[board_type]);
     }
+
+    printf("\nSetting Ethernet MAC and IP addresses\n\n");
+    if (!SetMACandIP("eth0", 0, board_id))
+        printf("Failed to set MAC or IP address for eth0\n");
+    if (!SetMACandIP("eth1", 1, board_id))
+        printf("Failed to set MAC or IP address for eth1\n");
 
     printf("*** FPGAV3 Initialization Complete ***\n\n");
     return 0;
