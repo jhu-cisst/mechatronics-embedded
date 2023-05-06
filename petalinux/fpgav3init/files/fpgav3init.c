@@ -2,7 +2,13 @@
 /* ex: set filetype=cpp softtabstop=4 shiftwidth=4 tabstop=4 cindent expandtab: */
 
 /*
- * Application to load firmware to FPGA V3.
+ * Application to initialize FPGA V3
+ *
+ * This program is auto-run at startup and does the following:
+ *   1) Reads EMIO to determine board information
+ *   2) Exports FPGAV3 environment variables (to shell)
+ *   3) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
+ *   4) Sets the Ethernet MAC and IP addresses
  */
 
 #include <stdio.h>
@@ -230,6 +236,28 @@ bool ProgramFpga(const char *firmwareName)
     return FpgaLoad(binFile);
 }
 
+// Export FPGA information as shell variables
+bool ExportFpgaInfo(char *fpga_ver, char *board_type, unsigned int board_id)
+{
+    mode_t mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
+    int fd = open("/etc/profile.d/fpgav3.sh", O_WRONLY|O_CREAT|O_TRUNC, mode);
+    if (fd == -1) {
+        printf("ExportFpgaInfo: could not open /etc/profile.d/fpgav3.sh\n");
+        return false;
+    }
+    char buf[64];
+    sprintf(buf, "export FPGAV3_VER=%s\n", fpga_ver);
+    write(fd, buf, strlen(buf)+1);
+    sprintf(buf, "export FPGAV3_HW=%s\n", board_type);
+    write(fd, buf, strlen(buf)+1);
+    if (board_id < 16) {
+        sprintf(buf, "export FPGAV3_ID=%d\n", board_id);
+        write(fd, buf, strlen(buf)+1);
+    }
+    close(fd);
+    return true;
+}
+
 // Set MAC and IP addresses for specified Ethernet adapter
 bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id)
 {
@@ -245,16 +273,16 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     ifr.ifr_hwaddr.sa_data[0] = 0xFA;
     ifr.ifr_hwaddr.sa_data[1] = 0x61;
     ifr.ifr_hwaddr.sa_data[2] = 0x0E;
-    ifr.ifr_hwaddr.sa_data[3] = 0x00;
-    ifr.ifr_hwaddr.sa_data[4] = ethNum;
-    ifr.ifr_hwaddr.sa_data[5] = board_id;
+    ifr.ifr_hwaddr.sa_data[3] = 0x03;       // FPGA V3
+    ifr.ifr_hwaddr.sa_data[4] = ethNum;     // 0 or 1
+    ifr.ifr_hwaddr.sa_data[5] = board_id;   // Board id: 0-15
     ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
     if (ioctl(sockfd, SIOCSIFHWADDR, &ifr) == -1)
         return false;
 
     // Set IP address
     char ip_addr[16];
-    sprintf(ip_addr, "192.168.%d.%d", (10+ethNum), board_id);
+    sprintf(ip_addr, "169.254.%d.%d", (10+ethNum), board_id);
     ifr.ifr_addr.sa_family = AF_INET;
     struct sockaddr_in* addr = (struct sockaddr_in*)&ifr.ifr_addr;
     inet_pton(AF_INET, ip_addr, &addr->sin_addr);
@@ -273,6 +301,9 @@ int main(int argc, char **argv)
     uint32_t reg_hw, reg_status;
     if (!EMIO_Read(&reg_hw, &reg_status))
         return -1;
+
+    // Close EMIO interface (no need to check return value)
+    EMIO_Init(false);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
@@ -309,11 +340,15 @@ int main(int argc, char **argv)
     }
     printf("Board type: %s\n", BoardName[board_type]);
 
-    printf("Board ID: %d\n", board_id);
+    printf("Board ID: %d\n\n", board_id);
 
-    // Close EMIO interface
-    if (!EMIO_Init(false))
-        return -1;
+    printf("Exporting FPGAV3 environment variables\n");
+    char fpga_ver[4];
+    fpga_ver[0] = '3';
+    fpga_ver[1] = '.';
+    fpga_ver[2] = isV30 ? '0' : '1';
+    fpga_ver[3] = '\0';
+    ExportFpgaInfo(fpga_ver, BoardName[board_type], board_id);
 
     if (strlen(FirmwareName[board_type]) > 0) {
         ProgramFpga(FirmwareName[board_type]);
