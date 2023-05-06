@@ -1,7 +1,8 @@
 
 # Set CMake minimum version requirement.
 # Need 3.15+ for ADDITIONAL_CLEAN_FILES property
-cmake_minimum_required(VERSION 3.15)
+# CMake 3.16 improved dependency checking in add_custom_target
+cmake_minimum_required(VERSION 3.16)
 
 project(FpgaBoard NONE)
 

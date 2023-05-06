@@ -63,7 +63,43 @@
 #  is used to specify additional dependencies, such as any apps that were created.
 #
 ##########################################################################################
-
+#
+# Important CMake Information
+#
+# This implementation relies on CMake add_custom_command and add_custom_target, so it is
+# important to understand how dependency checking works when using these commands.
+#
+# We use add_custom_command to produce an output, which is usually one or more files.
+# For dependencies (DEPENDS), we can specify files or targets. If a file is specified,
+# the command is executed if any of the outputs are older than the file.
+# If a target is specified, the custom command will be considered after the target is built
+# (i.e., the target dependency controls the order of the build, but may not cause the command
+# to be executed). Whether or not the command is executed depends only on the file dependency
+# check. Note: although not relevant here, CMake automatically adds file dependencies for
+# targets created by add_executable or add_library, but not for add_custom_target.
+#
+# CMake add_custom_target creates a target that is always executed. Although it is possible
+# to specify one or more commands (COMMAND), that capability is not used in this implementation.
+# Instead, add_custom_target is just used to control the order of the build process.
+# Typically, the dependencies (DEPENDS) are on the output files created by add_custom_command,
+# so that these custom commands are executed if needed (based on the dependencies specified
+# in add_custom_command). Starting with CMake 3.16, it also adds a target-level dependency
+# for any targets in the same directory that create one of the dependent files.
+#
+# This implementation creates the following targets:
+#
+#    ${PROJ_NAME}    Petalinux project name, created by petalinux_create. There is only one such
+#                    target and it should be the first one built.
+#
+#    ${APP_NAME}     Application name, created by petalinux_app_create. There may be multiple app
+#                    targets as a result of multiple calls to petalinux_app_create. This has a
+#                    target-level dependency on ${PROJ_NAME} via one of the dependent custom commands.
+#
+#    ${TARGET_NAME}  Final target (typically ${PROJ_NAME}_build), created by petalinux_build.
+#                    There is only one such target and it has target-level dependencies on ${PROJ_NAME}
+#                    and (via DEPENDENCIES arg to petalinux_build) on any ${APP_NAME} targets.
+#                    It should be the last target built.
+#
 ################################ petalinux_create ########################################
 
 function (petalinux_create ...)
@@ -82,7 +118,7 @@ function (petalinux_create ...)
   endforeach(keyword)
   set (CONFIG_MENU OFF)
 
-  # parse input
+  # parse input (could instead use cmake_parse_arguments)
   foreach (arg ${ARGV})
     list (FIND FUNCTION_KEYWORDS ${arg} ARGUMENT_IS_A_KEYWORD)
     if (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
@@ -97,11 +133,13 @@ function (petalinux_create ...)
 
     if (CONFIG_MENU)
       set (CONFIG_OPTION "")
-    else (CONFIG_MENU)
+    else ()
       set (CONFIG_OPTION "--silentconfig")
-    endif (CONFIG_MENU)
+    endif ()
 
-    set (CONFIG_SRC_FILES  "${CONFIG_SRC_DIR}/config" "${CONFIG_SRC_DIR}/rootfs_config")
+    get_filename_component (HW_FILE_NAME ${HW_FILE} NAME)
+
+    set (CONFIG_SRC_FILE     "${CONFIG_SRC_DIR}/config")
     set (DEVICE_TREE_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-bsp/device-tree/files")
 
     set (CONFIG_ARCHIVE_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-configs")
@@ -109,17 +147,21 @@ function (petalinux_create ...)
     file (WRITE  ${README_FILE} "Directory created by CMake for config files (config and rootfs_config):\n")
     file (APPEND ${README_FILE} " - config.default, rootfs_config.default: original versions from petalinux-create\n")
     file (APPEND ${README_FILE} " - config.hw: config file after specifying the hardware description\n")
-    file (APPEND ${README_FILE} " - config.<appname>: config file after creating app <appname>\n")
+    file (APPEND ${README_FILE} " - rootfs_config.<appname>: rootfs_config file after creating app <appname>\n")
     file (APPEND ${README_FILE} " - config.cfg: config file after configuring the kernel (also used as CMake build output)\n")
     file (APPEND ${README_FILE} " - rootfs_config.cfg: config file after configuring rootfs (also used as CMake build output)\n")
 
     set (CONFIG_BIN_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs")
     set (CONFIG_BIN_FILE  "${CONFIG_BIN_DIR}/config")
 
-    # Create the project. This does not take very long.
+    # Output of petalinux-create
     set (PETALINUX_CREATE_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/config.project")
+    # Output of petalinux-config (hardware)
+    set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
+
     add_custom_command (
-        OUTPUT ${PETALINUX_CREATE_OUTPUT}
+        OUTPUT ${PETALINUX_CREATE_OUTPUT} ${PETALINUX_CONFIG_HW_OUTPUT}
+        # Create the project. This does not take very long.
         COMMAND petalinux-create -t project --force --template zynq -n ${PROJ_NAME}
         # Archive default versions of config and rootfs_config
         COMMAND ${CMAKE_COMMAND}
@@ -130,38 +172,31 @@ function (petalinux_create ...)
                 ARGS -E copy_if_different
                 "${CONFIG_BIN_DIR}/rootfs_config"
                 "${CONFIG_ARCHIVE_DIR}/rootfs_config.default"
-        COMMENT "Creating Petalinux project ${PROJ_NAME}")
-
-    # Outputs of petalinux-config (hardware and kernel)
-    set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
-
-    add_custom_command (
-        OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
-        # Copy the config files if needed
+        # Copy the config file from the source tree (rootfs_config is copied in petalinux_build)
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
-                ${CONFIG_SRC_FILES}
-                ${CONFIG_BIN_DIR}
+                ${CONFIG_SRC_FILE}
+                ${CONFIG_BIN_FILE}
         # Specify the hardware description (XSA) file. This does not take very long and has one config menu
-        # (shown if CONFIG_MENU is ON).
+        # (shown if CONFIG_MENU is ON). This menu can also be shown by typing petalinux-config -p ${PROJ_NAME}
+        # on the command line.
         COMMAND petalinux-config -p ${PROJ_NAME} --get-hw-description ${HW_FILE} ${CONFIG_OPTION}
         # Archive config file
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
-                ${CONFIG_BIN_FILE}
+                "${CONFIG_BIN_DIR}/config"
                 "${CONFIG_ARCHIVE_DIR}/config.hw"
-        COMMENT "Configuring hardware from ${HW_FILE}"
-        DEPENDS ${HW_FILE} ${CONFIG_SRC_FILES} ${PETALINUX_CREATE_OUTPUT})
+        COMMENT "Creating Petalinux project ${PROJ_NAME} and configuring hardware from ${HW_FILE_NAME}"
+        # Adding dependency on ${CONFIG_SRC_FILE} forces a complete rebuild if the config file is
+	# changed, even though in many cases it would not be necessary (i.e., it is only necessary
+	# if one of the hw-description entries is updated).
+        DEPENDS ${HW_FILE} ${CONFIG_SRC_FILE})
 
+    # Output from configuring kernel
     set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.cfg")
 
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_OUTPUT}
-        # Copy the config file if needed
-        COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                ${CONFIG_SRC_FILES}
-                ${CONFIG_BIN_DIR}
         # Copy the device-tree file if needed
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
@@ -176,16 +211,16 @@ function (petalinux_create ...)
                 ${CONFIG_BIN_FILE}
                 ${PETALINUX_CONFIG_OUTPUT}
         COMMENT "Configuring Petalinux kernel"
-        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${CONFIG_SRC_FILES} ${DEVICE_TREE_FILES})
+        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${DEVICE_TREE_FILES})
 
     add_custom_target(${PROJ_NAME} ALL
                       DEPENDS ${PETALINUX_CONFIG_OUTPUT})
 
-  else (PROJ_NAME AND HW_FILE AND CONFIG_SRC_DIR AND DEVICE_TREE_FILES)
+  else ()
 
     message (SEND_ERROR "petalinux_create: required parameter missing")
 
-  endif (PROJ_NAME AND HW_FILE AND CONFIG_SRC_DIR AND DEVICE_TREE_FILES)
+  endif ()
 
 endfunction (petalinux_create)
 
@@ -207,7 +242,7 @@ function (petalinux_app_create ...)
   endforeach(keyword)
   set (APP_TEMPLATE c)
 
-  # parse input
+  # parse input (could instead use cmake_parse_arguments)
   foreach (arg ${ARGV})
     list (FIND FUNCTION_KEYWORDS ${arg} ARGUMENT_IS_A_KEYWORD)
     if (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
@@ -225,61 +260,69 @@ function (petalinux_app_create ...)
       # which is copied and renamed to system.bit. This feature ("fpgamanager" template) is not currently used.
       set (APP_BIN           "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-firmware/${APP_NAME}")
       set (APP_FILES_BIN     "${APP_BIN}/files/system.bit")
-    else (APP_TEMPLATE STREQUAL "fpgamanager")
+    else ()
       # For all other apps, files are in recipes-apps. In this case APP_SOURCES can specify more than one file, though further
       # updates may be necessary to support this (e.g., via .bbappend)
       set (APP_BIN           "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-apps/${APP_NAME}")
       set (APP_FILES_BIN     "${APP_BIN}/files")
-    endif (APP_TEMPLATE STREQUAL "fpgamanager")
+    endif ()
+
     set (APP_CREATE_OUTPUT "${APP_BIN}/${APP_NAME}.bb")
 
     set (CONFIG_ARCHIVE_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-configs")
     set (ROOTFS_CONFIG      "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs/rootfs_config")
 
-    add_custom_command (
-        OUTPUT ${APP_CREATE_OUTPUT}
-        COMMAND petalinux-create -p ${PROJ_NAME} -t apps --template ${APP_TEMPLATE} --name ${APP_NAME} --enable --force
-        # Enabling the app modifies configs/rootfs_config, so archive it
-        COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                ${ROOTFS_CONFIG}
-                "${CONFIG_ARCHIVE_DIR}/rootfs_config.${APP_NAME}"
-        # Copy the source files
-        COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                ${APP_SOURCES}
-                ${APP_FILES_BIN}
-        COMMENT "Creating ${APP_NAME}"
-        DEPENDS ${APP_SOURCES})
-
     if (APP_BBAPPEND)
 
-      set (APP_BBAPPEND_OUTPUT "${APP_BIN}/${APP_BBAPPEND}")
       add_custom_command (
-          OUTPUT ${APP_BBAPPEND_OUTPUT}
+          OUTPUT ${APP_CREATE_OUTPUT}
+          COMMAND petalinux-create -p ${PROJ_NAME} -t apps --template ${APP_TEMPLATE} --name ${APP_NAME} --enable --force
+          # Enabling the app modifies configs/rootfs_config, so archive it
+          COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${ROOTFS_CONFIG}
+                  "${CONFIG_ARCHIVE_DIR}/rootfs_config.${APP_NAME}"
           # Copy the source files
+          COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${APP_SOURCES}
+                  ${APP_FILES_BIN}
+          # Copy the bbappend source file
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
                   ${APP_BBAPPEND}
                   ${APP_BIN}
-          COMMENT "Checking ${APP_BBAPPEND}"
-          DEPENDS ${APP_CREATE_OUTPUT} ${APP_BBAPPEND})
+          COMMENT "Creating ${APP_NAME}"
+          DEPENDS ${PROJ_NAME} ${APP_SOURCES} ${APP_BBAPPEND})
 
-      add_custom_target(${APP_NAME} ALL
-                        DEPENDS ${APP_BBAPPEND_OUTPUT})
+    else ()
 
-    else (APP_BBAPPEND)
+      add_custom_command (
+          OUTPUT ${APP_CREATE_OUTPUT}
+          COMMAND petalinux-create -p ${PROJ_NAME} -t apps --template ${APP_TEMPLATE} --name ${APP_NAME} --enable --force
+          # Enabling the app modifies configs/rootfs_config, so archive it
+          COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${ROOTFS_CONFIG}
+                  "${CONFIG_ARCHIVE_DIR}/rootfs_config.${APP_NAME}"
+          # Copy the source files
+          COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${APP_SOURCES}
+                  ${APP_FILES_BIN}
+          COMMENT "Creating ${APP_NAME}"
+          DEPENDS ${PROJ_NAME} ${APP_SOURCES})
 
-      add_custom_target(${APP_NAME} ALL
-                        DEPENDS ${APP_CREATE_OUTPUT})
+    endif ()
 
-    endif (APP_BBAPPEND)
+    add_custom_target(${APP_NAME} ALL
+                      DEPENDS ${APP_CREATE_OUTPUT})
 
-  else (PROJ_NAME AND APP_NAME AND APP_SOURCES)
+  else ()
 
     message (SEND_ERROR "petalinux_app_create: required parameter missing")
 
-  endif (PROJ_NAME AND APP_NAME AND APP_SOURCES)
+  endif ()
 
 endfunction (petalinux_app_create)
 
@@ -302,7 +345,7 @@ function (petalinux_build ...)
   endforeach(keyword)
   set (CONFIG_MENU OFF)
 
-  # parse input
+  # parse input (could instead use cmake_parse_arguments)
   foreach (arg ${ARGV})
     list (FIND FUNCTION_KEYWORDS ${arg} ARGUMENT_IS_A_KEYWORD)
     if (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
@@ -317,38 +360,30 @@ function (petalinux_build ...)
 
     if (CONFIG_MENU)
       set (CONFIG_OPTION "")
-    else (CONFIG_MENU)
+    else ()
       set (CONFIG_OPTION "--silentconfig")
-    endif (CONFIG_MENU)
+    endif ()
 
-    set (CONFIG_SRC_FILES "${CONFIG_SRC_DIR}/config" "${CONFIG_SRC_DIR}/rootfs_config")
+    set (CONFIG_SRC_FILE  "${CONFIG_SRC_DIR}/rootfs_config")
     set (CONFIG_BIN_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs")
     set (CONFIG_BIN_FILE  "${CONFIG_BIN_DIR}/rootfs_config")
     set (CONFIG_ARCHIVE_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-configs")
 
     set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux")
 
+    # First, configure rootfs. This is done here, rather than in petalinux_create, because
+    # petalinux_app_create also modifies rootfs_config.
+
     # Output of petalinux-configure
     set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/rootfs_config.cfg")
 
-    # Outputs of petalinux-build
-    set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
-    set (PETALINUX_FSBL_FILE  "${PETALINUX_IMAGE_DIR}/zynq_fsbl.elf")
-    set (PETALINUX_UBOOT_FILE "${PETALINUX_IMAGE_DIR}/u-boot.elf")
-
-    # Output of petalinux-package
-    set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
-
-    # First, configure rootfs. This is done here, rather than in petalinux_create, because
-    # petalinux_app_create also modifies rootfs.
-
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_OUTPUT}
-        # Copy the config files if needed
+        # Copy the rootfs_config file from the source tree.
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
-                ${CONFIG_SRC_FILES}
-                ${CONFIG_BIN_DIR}
+                ${CONFIG_SRC_FILE}
+                ${CONFIG_BIN_FILE}
         # Configure the rootfs. This does not take a long time and has one config menu
         # (shown if CONFIG_MENU is ON).
         COMMAND petalinux-config -p ${PROJ_NAME} -c rootfs ${CONFIG_OPTION}
@@ -357,17 +392,28 @@ function (petalinux_build ...)
                 ARGS -E copy
                 ${CONFIG_BIN_FILE}
                 ${PETALINUX_CONFIG_OUTPUT}
-        COMMENT "Configuring Petalinux rootfs"
-        DEPENDS ${PROJ_NAME} ${CONFIG_SRC_FILES} ${DEPENDENCIES})
+        COMMENT "Copying rootfs_config to build tree and configuring rootfs"
+        # May not be necessary to have dependency on ${CONFIG_BIN_FILE}, but this might
+	# help since petalinux_app_create also modifies rootfs_config.
+        DEPENDS ${PROJ_NAME} ${CONFIG_SRC_FILE} ${CONFIG_BIN_FILE})
 
     # Next, build petalinux.
+    # Outputs of petalinux-build
+    set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
+    set (PETALINUX_FSBL_FILE  "${PETALINUX_IMAGE_DIR}/zynq_fsbl.elf")
+    set (PETALINUX_UBOOT_FILE "${PETALINUX_IMAGE_DIR}/u-boot.elf")
+
     add_custom_command (
         OUTPUT ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE}
         COMMAND petalinux-build -p ${PROJ_NAME}
         COMMENT "Building petalinux"
-        DEPENDS ${PETALINUX_CONFIG_OUTPUT})
+        DEPENDS ${PETALINUX_CONFIG_OUTPUT} ${DEPENDENCIES})
 
     # Package the boot files
+
+    # Output of petalinux-package
+    set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
+
     if (BIT_FILE)
 
       add_custom_command (
@@ -377,7 +423,7 @@ function (petalinux_build ...)
           COMMENT "Petalinux package (boot image)"
           DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
-    else (BIT_FILE)
+    else ()
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
@@ -387,7 +433,7 @@ function (petalinux_build ...)
                 "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs"
           DEPENDS ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
-    endif (BIT_FILE)
+    endif ()
 
     # Finally, check if config files in build tree differ from source tree
     # (if there is a difference, consider updating source tree).
@@ -413,10 +459,10 @@ function (petalinux_build ...)
     add_custom_target(${TARGET_NAME} ALL
                       DEPENDS compare_output)
 
-  else (TARGET_NAME AND PROJ_NAME AND CONFIG_SRC_DIR)
+  else ()
 
     message (SEND_ERROR "petalinux_build: required parameter missing")
 
-  endif (TARGET_NAME AND PROJ_NAME AND CONFIG_SRC_DIR)
+  endif ()
 
 endfunction (petalinux_build)

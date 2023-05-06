@@ -27,7 +27,7 @@ petalinux_app_create(APP_NAME       "fpgav3init"
                      APP_SOURCES    ${FPGAV3INIT_SOURCES}
                      APP_BBAPPEND   ${FPGAV3INIT_BBAPPEND})
 
-set (PETALINUX_BUILD_DEPS ${PETALINUX_CONFIG_FILES} ${PETALINUX_DEVICE_TREE} ${FPGAV3INIT_SOURCES} "fpgav3init")
+set (PETALINUX_BUILD_DEPS "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND})
 
 petalinux_build(TARGET_NAME         "fpgav3_build"
                 PROJ_NAME           "fpgav3"
