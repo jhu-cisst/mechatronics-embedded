@@ -34,8 +34,10 @@ if (USE_VIVADO)
     include(${VIVADO_USE_FILE})
 
     if (BUILD_FPGAV30)
+      set (BLOCK_DESIGN_NAME "FpgaV30BlockDesign")
       set (HW_XSA_FILE  "${CMAKE_CURRENT_BINARY_DIR}/block_design/FpgaV30.xsa")
     else (BUILD_FPGAV30)
+      set (BLOCK_DESIGN_NAME "FpgaV31BlockDesign")
       set (HW_XSA_FILE  "${CMAKE_CURRENT_BINARY_DIR}/block_design/FpgaV31.xsa")
     endif (BUILD_FPGAV30)
 
@@ -49,6 +51,7 @@ if (USE_VIVADO)
 
 else (USE_VIVADO)
 
+  set (BLOCK_DESIGN_NAME "")
   if (BUILD_FPGAV30)
     find_file (HW_XSA_FILE "FpgaV30.xsa" DOC "XSA file produced by Vivado")
   else (BUILD_FPGAV30)
