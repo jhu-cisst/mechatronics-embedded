@@ -25,18 +25,12 @@ set (FPGAV3INIT_TARGET "fpgav3initonly")
 # Additional source files
 set (FPGAV3INIT_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/fpgav3init/files/fpgav3init.c")
 
-vitis_app_create_from_template(
-    TARGET_NAME    "${FPGAV3INIT_TARGET}_create"
-    APP_NAME       ${FPGAV3INIT_NAME}
-    PLATFORM_NAME  ${PLATFORM_LINUX}
-    TEMPLATE_NAME  "Linux Empty Application")
-
-vitis_app_build(
+vitis_app_create(
     TARGET_NAME    ${FPGAV3INIT_TARGET}
     APP_NAME       ${FPGAV3INIT_NAME}
     PLATFORM_NAME  ${PLATFORM_LINUX}
+    TEMPLATE_NAME  "Linux Empty Application"
     ADD_SOURCE     ${FPGAV3INIT_SOURCE}
-    BUILD_CONFIG   ${FPGAV3INIT_CONFIG}
-    DEPENDENCIES   "${FPGAV3INIT_TARGET}_create")
+    BUILD_CONFIG   ${FPGAV3INIT_CONFIG})
 
 set (FPGAV3INIT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${FPGAV3INIT_NAME}/${FPGAV3INIT_CONFIG}/${FPGAV3INIT_NAME}.elf")

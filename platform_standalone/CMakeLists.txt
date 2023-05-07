@@ -32,19 +32,13 @@ set (FSBL_CONFIG "Release")
 set (FSBL_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c")
 
-vitis_app_create_from_template(
-    TARGET_NAME    "${FSBL_NAME}_create"
+vitis_app_create(
     APP_NAME       ${FSBL_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
-    TEMPLATE_NAME  "Zynq FSBL")
-
-vitis_app_build(
-    APP_NAME       ${FSBL_NAME}
-    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    TEMPLATE_NAME  "Zynq FSBL"
     ADD_SOURCE     ${FSBL_SOURCE}
     BUILD_CONFIG   ${FSBL_CONFIG}
-    COMPILER_FLAGS "FSBL_DEBUG_INFO"
-    DEPENDENCIES   "${FSBL_NAME}_create")
+    COMPILER_FLAGS "FSBL_DEBUG_INFO")
 
 set (FSBL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${FSBL_NAME}/${FSBL_CONFIG}/${FSBL_NAME}.elf")
 
@@ -61,18 +55,12 @@ set (MFG_TEST_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/memtest.c"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c")
 
-vitis_app_create_from_template(
-    TARGET_NAME    "${MFG_TEST_NAME}_create"
+vitis_app_create(
     APP_NAME       ${MFG_TEST_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
-    TEMPLATE_NAME  "Zynq FSBL")
-
-vitis_app_build(
-    APP_NAME       ${MFG_TEST_NAME}
-    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    TEMPLATE_NAME  "Zynq FSBL"
     ADD_SOURCE     ${MFG_TEST_SOURCE}
-    BUILD_CONFIG   ${MFG_TEST_CONFIG}
-    DEPENDENCIES   "${MFG_TEST_NAME}_create")
+    BUILD_CONFIG   ${MFG_TEST_CONFIG})
 
 set (MFG_TEST_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${MFG_TEST_NAME}/${MFG_TEST_CONFIG}/${MFG_TEST_NAME}.elf")
 
@@ -84,18 +72,12 @@ set (ECHO_TEST_CONFIG "Release")
 # Additional source files
 set (ECHO_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/echo_test_src/main.c")
 
-vitis_app_create_from_template(
-    TARGET_NAME    "${ECHO_TEST_NAME}_create"
+vitis_app_create(
     APP_NAME       ${ECHO_TEST_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
-    TEMPLATE_NAME  "lwIP Echo Server")
-
-vitis_app_build(
-    APP_NAME       ${ECHO_TEST_NAME}
-    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    TEMPLATE_NAME  "lwIP Echo Server"
     ADD_SOURCE     ${ECHO_TEST_SOURCE}
-    BUILD_CONFIG   ${ECHO_TEST_CONFIG}
-    DEPENDENCIES   "${ECHO_TEST_NAME}_create")
+    BUILD_CONFIG   ${ECHO_TEST_CONFIG})
 
 set (ECHO_TEST_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${ECHO_TEST_NAME}/${ECHO_TEST_CONFIG}/${ECHO_TEST_NAME}.elf")
 
@@ -108,19 +90,13 @@ set (DEMO_APP_CONFIG "Release")
 set (DEMO_APP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/demo_app_src/main.c")
 set (DEMO_APP_DELETE "helloworld.c")
 
-vitis_app_create_from_template(
-    TARGET_NAME    "${DEMO_APP_NAME}_create"
+vitis_app_create(
     APP_NAME       ${DEMO_APP_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
-    TEMPLATE_NAME  "Hello World")
-
-vitis_app_build(
-    APP_NAME       ${DEMO_APP_NAME}
-    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    TEMPLATE_NAME  "Hello World"
     ADD_SOURCE     ${DEMO_APP_SOURCE}
     DEL_SOURCE     ${DEMO_APP_DELETE}
-    BUILD_CONFIG   ${DEMO_APP_CONFIG}
-    DEPENDENCIES   "${DEMO_APP_NAME}_create")
+    BUILD_CONFIG   ${DEMO_APP_CONFIG})
 
 set (DEMO_APP_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${DEMO_APP_NAME}/${DEMO_APP_CONFIG}/${DEMO_APP_NAME}.elf")
 

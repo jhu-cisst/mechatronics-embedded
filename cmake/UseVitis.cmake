@@ -30,35 +30,21 @@
 #
 ##########################################################################################
 #
-# Function: vitis_app_create_from_template
-#
-# Parameters:
-#   - TARGET_NAME     CMake target name
-#   - APP_NAME        Name of application
-#   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
-#   - TEMPLATE_NAME   Name of Vitis application template
-#
-# Description:
-#   This function creates an application from the specified template. The expectation
-#   is that this will only need to be executed one time, since the source files are
-#   not considered until the vitis_app_build function.
-#
-##########################################################################################
-#
-# Function: vitis_app_build
+# Function: vitis_app_create
 #
 # Parameters:
 #   - TARGET_NAME     CMake target name (optional, defaults to APP_NAME)
 #   - APP_NAME        Name of application
 #   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
+#   - TEMPLATE_NAME   Name of Vitis application template
 #   - ADD_SOURCE      Additional source files (optional)
 #   - DEL_SOURCE      Source files to delete (optional)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
 #   - COMPILER_FLAGS  Compiler flags (optional)
-#   - DEPENDENCIES    Additional dependencies (optional)
 #
 # Description:
-#   This function creates the target to build the application.
+#   This function creates an application from the specified template and then
+#   builds it.
 #
 ##########################################################################################
 #
@@ -168,74 +154,18 @@ function (vitis_platform_create ...)
 
 endfunction (vitis_platform_create)
 
-function (vitis_app_create_from_template ...)
+function (vitis_app_create ...)
 
   # set all keywords and their values to ""
   set (FUNCTION_KEYWORDS
        TARGET_NAME
        APP_NAME
        PLATFORM_NAME
-       TEMPLATE_NAME)
-
-  # reset local variables
-  foreach(keyword ${FUNCTION_KEYWORDS})
-    set (${keyword} "")
-  endforeach(keyword)
-
-  # parse input (could instead use cmake_parse_arguments)
-  foreach (arg ${ARGV})
-    list (FIND FUNCTION_KEYWORDS ${arg} ARGUMENT_IS_A_KEYWORD)
-    if (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
-      set (CURRENT_PARAMETER ${arg})
-      set (${CURRENT_PARAMETER} "")
-    else (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
-      set (${CURRENT_PARAMETER} ${${CURRENT_PARAMETER}} ${arg})
-    endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
-  endforeach (arg)
-
-  file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
-
-  if (TARGET_NAME AND APP_NAME AND PLATFORM_NAME AND TEMPLATE_NAME)
-
-    # Create TCL file
-    set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${APP_NAME}-create.tcl")
-    file (WRITE  ${TCL_FILE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
-    # Set active platform
-    file (APPEND ${TCL_FILE} "platform active ${PLATFORM_NAME}\n")
-    # Create app, using active platform (and domain); also creates sysproj ${APP_NAME}_system
-    file (APPEND ${TCL_FILE} "if { [catch {app create -name ${APP_NAME} -template {${TEMPLATE_NAME}}} errMsg ]} {\n")
-    file (APPEND ${TCL_FILE} "  puts stderr \"app create: $errMsg\"\n}\n")
-
-    # The PRJ file is one of the generated outputs
-    set (APP_PRJ "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${APP_NAME}.prj")
-
-    add_custom_command (OUTPUT ${APP_PRJ}
-                        COMMAND ${XSCT_NATIVE} ${TCL_FILE}
-                        DEPENDS ${PLATFORM_NAME})
-
-    add_custom_target(${TARGET_NAME} ALL
-                      DEPENDS ${APP_PRJ})
-
-  else ()
-
-    message (SEND_ERROR "vitis_app_create_from_template: required parameter missing")
-
-  endif ()
-
-endfunction (vitis_app_create_from_template)
-
-function (vitis_app_build ...)
-
-  # set all keywords and their values to ""
-  set (FUNCTION_KEYWORDS
-       TARGET_NAME
-       APP_NAME
-       PLATFORM_NAME
+       TEMPLATE_NAME
        ADD_SOURCE
        DEL_SOURCE
        BUILD_CONFIG
-       COMPILER_FLAGS
-       DEPENDENCIES)
+       COMPILER_FLAGS)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -253,7 +183,7 @@ function (vitis_app_build ...)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (APP_NAME AND PLATFORM_NAME)
+  if (APP_NAME AND PLATFORM_NAME AND TEMPLATE_NAME)
 
     # If TARGET_NAME not specified, default is APP_NAME
     if (NOT TARGET_NAME)
@@ -267,52 +197,77 @@ function (vitis_app_build ...)
 
     file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
 
+    #************** First, create the app ****************
+
     # Create TCL file
-    set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${TARGET_NAME}-build.tcl")
-    file (WRITE  ${TCL_FILE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
+    set (TCL_CREATE "${CMAKE_CURRENT_BINARY_DIR}/make-${APP_NAME}-create.tcl")
+    file (WRITE  ${TCL_CREATE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
     # Set active platform
-    file (APPEND ${TCL_FILE} "platform active ${PLATFORM_NAME}\n")
+    file (APPEND ${TCL_CREATE} "platform active ${PLATFORM_NAME}\n")
+    # Create app, using active platform (and domain); also creates sysproj ${APP_NAME}_system
+    file (APPEND ${TCL_CREATE} "if { [catch {app create -name ${APP_NAME} -template {${TEMPLATE_NAME}}} errMsg ]} {\n")
+    file (APPEND ${TCL_CREATE} "  puts stderr \"app create: $errMsg\"\n}\n")
+
+    # The PRJ file is one of the generated outputs
+    set (APP_PRJ "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${APP_NAME}.prj")
+
+    add_custom_command (OUTPUT ${APP_PRJ}
+                        COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
+                        COMMENT "Creating app ${APP_NAME}"
+                        DEPENDS ${PLATFORM_NAME})
+
+    add_custom_target("${TARGET_NAME}_create" ALL
+                      DEPENDS ${APP_PRJ})
+
+    #************** Next, build the app ****************
+
+    # Create TCL file
+    set (TCL_BUILD "${CMAKE_CURRENT_BINARY_DIR}/make-${TARGET_NAME}-build.tcl")
+    file (WRITE  ${TCL_BUILD} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
+    # Set active platform
+    file (APPEND ${TCL_BUILD} "platform active ${PLATFORM_NAME}\n")
     # Delete any specified source file
     foreach (src ${DEL_SOURCE})
-      file (APPEND ${TCL_FILE} "file delete ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/src/${src}\n")
+      file (APPEND ${TCL_BUILD} "file delete ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/src/${src}\n")
     endforeach (src)
     # Add source files, if any
     foreach (src ${ADD_SOURCE})
-      file (APPEND ${TCL_FILE} "importsources -name ${APP_NAME} -path ${src}\n")
+      file (APPEND ${TCL_BUILD} "importsources -name ${APP_NAME} -path ${src}\n")
     endforeach (src)
     # Set build configuration (i.e., Release or Debug)
-    file (APPEND ${TCL_FILE} "if { [catch {app config -name ${APP_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
-    file (APPEND ${TCL_FILE} "  puts stderr \"app build-config: $errMsgCfg\"\n}\n")
+    file (APPEND ${TCL_BUILD} "if { [catch {app config -name ${APP_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
+    file (APPEND ${TCL_BUILD} "  puts stderr \"app build-config: $errMsgCfg\"\n}\n")
     # Set compiler flags
     foreach (flag ${COMPILER_FLAGS})
-      file (APPEND ${TCL_FILE} "if { [catch {app config -name ${APP_NAME} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
-      file (APPEND ${TCL_FILE} "  puts stderr \"app config: $errMsgFlag\"\n}\n")
+      file (APPEND ${TCL_BUILD} "if { [catch {app config -name ${APP_NAME} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
+      file (APPEND ${TCL_BUILD} "  puts stderr \"app config: $errMsgFlag\"\n}\n")
     endforeach (flag)
     # Compile app
-    file (APPEND ${TCL_FILE} "if { [catch {app build -name ${APP_NAME}} errMsgBuild]} {\n")
-    file (APPEND ${TCL_FILE} "  puts stderr \"app build: $errMsgBuild\"\n}\n")
+    file (APPEND ${TCL_BUILD} "if { [catch {app build -name ${APP_NAME}} errMsgBuild]} {\n")
+    file (APPEND ${TCL_BUILD} "  puts stderr \"app build: $errMsgBuild\"\n}\n")
 
     # This is the output (executable)
     set (APP_EXEC "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${BUILD_CONFIG}/${APP_NAME}.elf")
 
     add_custom_command (OUTPUT ${APP_EXEC}
-                        COMMAND ${XSCT_NATIVE} ${TCL_FILE}
-                        DEPENDS ${DEPENDENCIES} ${ADD_SOURCE})
+                        COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
+                        COMMENT "Building app ${APP_NAME}"
+                        DEPENDS "${TARGET_NAME}_create" ${ADD_SOURCE})
 
     add_custom_target(${TARGET_NAME} ALL
                       DEPENDS ${APP_EXEC})
 
     set_property(TARGET ${TARGET_NAME}
                  APPEND
-                 PROPERTY ADDITIONAL_CLEAN_FILES ${TCL_FILE})
+                 PROPERTY ADDITIONAL_CLEAN_FILES ${TCL_CREATE} ${TCL_BUILD})
 
   else ()
 
-    message (SEND_ERROR "vitis_app_build: required parameter missing")
+    message (SEND_ERROR "vitis_app_create: required parameter missing")
 
   endif ()
 
-endfunction (vitis_app_build)
+endfunction (vitis_app_create)
 
 function (vitis_boot_create ...)
 
