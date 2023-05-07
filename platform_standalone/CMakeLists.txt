@@ -99,6 +99,31 @@ vitis_app_build(
 
 set (ECHO_TEST_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${ECHO_TEST_NAME}/${ECHO_TEST_CONFIG}/${ECHO_TEST_NAME}.elf")
 
+############################## Demo App ################################
+
+set (DEMO_APP_NAME   "demo_app")
+set (DEMO_APP_CONFIG "Release")
+
+# Additional source files
+set (DEMO_APP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/demo_app_src/main.c")
+set (DEMO_APP_DELETE "helloworld.c")
+
+vitis_app_create_from_template(
+    TARGET_NAME    "${DEMO_APP_NAME}_create"
+    APP_NAME       ${DEMO_APP_NAME}
+    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    TEMPLATE_NAME  "Hello World")
+
+vitis_app_build(
+    APP_NAME       ${DEMO_APP_NAME}
+    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    ADD_SOURCE     ${DEMO_APP_SOURCE}
+    DEL_SOURCE     ${DEMO_APP_DELETE}
+    BUILD_CONFIG   ${DEMO_APP_CONFIG}
+    DEPENDENCIES   "${DEMO_APP_NAME}_create")
+
+set (DEMO_APP_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${DEMO_APP_NAME}/${DEMO_APP_CONFIG}/${DEMO_APP_NAME}.elf")
+
 ########################### Boot Images #############################
 
 if (BIT_FILE)
@@ -122,6 +147,14 @@ if (BIT_FILE)
       BIT_FILE       ${BIT_FILE}
       APP_FILE       ${ECHO_TEST_OUTPUT}
       DEPENDENCIES   ${ECHO_TEST_DEPS})
+
+  set (DEMO_APP_DEPS ${FSBL_OUTPUT} ${DEMO_APP_NAME})
+  vitis_boot_create(
+      BIF_NAME       "demo_app_boot"
+      FSBL_FILE      ${FSBL_OUTPUT}
+      BIT_FILE       ${BIT_FILE}
+      APP_FILE       ${DEMO_APP_OUTPUT}
+      DEPENDENCIES   ${DEMO_APP_DEPS})
 
 else (BIT_FILE)
 

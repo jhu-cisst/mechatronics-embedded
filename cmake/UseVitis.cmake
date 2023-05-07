@@ -52,6 +52,7 @@
 #   - APP_NAME        Name of application
 #   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
 #   - ADD_SOURCE      Additional source files (optional)
+#   - DEL_SOURCE      Source files to delete (optional)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
 #   - COMPILER_FLAGS  Compiler flags (optional)
 #   - DEPENDENCIES    Additional dependencies (optional)
@@ -231,6 +232,7 @@ function (vitis_app_build ...)
        APP_NAME
        PLATFORM_NAME
        ADD_SOURCE
+       DEL_SOURCE
        BUILD_CONFIG
        COMPILER_FLAGS
        DEPENDENCIES)
@@ -270,6 +272,10 @@ function (vitis_app_build ...)
     file (WRITE  ${TCL_FILE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
     # Set active platform
     file (APPEND ${TCL_FILE} "platform active ${PLATFORM_NAME}\n")
+    # Delete any specified source file
+    foreach (src ${DEL_SOURCE})
+      file (APPEND ${TCL_FILE} "file delete ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/src/${src}\n")
+    endforeach (src)
     # Add source files, if any
     foreach (src ${ADD_SOURCE})
       file (APPEND ${TCL_FILE} "importsources -name ${APP_NAME} -path ${src}\n")
