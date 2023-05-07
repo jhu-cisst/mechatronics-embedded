@@ -188,8 +188,8 @@ function (petalinux_create ...)
                 "${CONFIG_ARCHIVE_DIR}/config.hw"
         COMMENT "Creating Petalinux project ${PROJ_NAME} and configuring hardware from ${HW_FILE_NAME}"
         # Adding dependency on ${CONFIG_SRC_FILE} forces a complete rebuild if the config file is
-	# changed, even though in many cases it would not be necessary (i.e., it is only necessary
-	# if one of the hw-description entries is updated).
+        # changed, even though in many cases it would not be necessary (i.e., it is only necessary
+        # if one of the hw-description entries is updated).
         DEPENDS ${HW_FILE} ${CONFIG_SRC_FILE})
 
     # Output from configuring kernel
@@ -214,6 +214,7 @@ function (petalinux_create ...)
         DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${DEVICE_TREE_FILES})
 
     add_custom_target(${PROJ_NAME} ALL
+                      COMMENT "Checking Petalinux creation and hardware/kernel configuration"
                       DEPENDS ${PETALINUX_CONFIG_OUTPUT})
 
   else ()
@@ -316,6 +317,7 @@ function (petalinux_app_create ...)
     endif ()
 
     add_custom_target(${APP_NAME} ALL
+                      COMMENT "Checking creation of ${APP_NAME} app"
                       DEPENDS ${APP_CREATE_OUTPUT})
 
   else ()
@@ -394,7 +396,7 @@ function (petalinux_build ...)
                 ${PETALINUX_CONFIG_OUTPUT}
         COMMENT "Copying rootfs_config to build tree and configuring rootfs"
         # May not be necessary to have dependency on ${CONFIG_BIN_FILE}, but this might
-	# help since petalinux_app_create also modifies rootfs_config.
+        # help since petalinux_app_create also modifies rootfs_config.
         DEPENDS ${PROJ_NAME} ${CONFIG_SRC_FILE} ${CONFIG_BIN_FILE})
 
     # Next, build petalinux.
@@ -435,29 +437,30 @@ function (petalinux_build ...)
 
     endif ()
 
+    add_custom_target(${TARGET_NAME} ALL
+                      COMMENT "Checking Petalinux rootfs configuration and build"
+                      DEPENDS ${PETALINUX_BOOT_FILE})
+
     # Finally, check if config files in build tree differ from source tree
     # (if there is a difference, consider updating source tree).
-    set_source_files_properties (compare_output PROPERTIES SYMBOLIC true)
     add_custom_command (
-        OUTPUT compare_output
+        TARGET ${TARGET_NAME} POST_BUILD
         # CMake provides a portable compare_files command:
         #   ${CMAKE_COMMAND} ARGS -E compare_files <file1> <file2>
         # But, since Petalinux only runs on Linux and since we also want
         # to see which lines are different, we just use the "diff" command.
         # The "|| :" is added so that differences are not flagged as errors.
+        COMMAND ${CMAKE_COMMAND} -E echo "Checking config"
         COMMAND diff
                 "${CONFIG_BIN_DIR}/config"
                 "${CONFIG_SRC_DIR}/config"
                 || :
+        COMMAND ${CMAKE_COMMAND} -E echo "Checking rootfs_config"
         COMMAND diff
                 "${CONFIG_BIN_DIR}/rootfs_config"
                 "${CONFIG_SRC_DIR}/rootfs_config"
                 || :
-        COMMENT "Comparing config files in build tree to source tree"
-        DEPENDS ${PETALINUX_BOOT_FILE})
-
-    add_custom_target(${TARGET_NAME} ALL
-                      DEPENDS compare_output)
+        COMMENT "Comparing config files in build tree to source tree")
 
   else ()
 
