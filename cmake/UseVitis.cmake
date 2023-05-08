@@ -199,25 +199,47 @@ function (vitis_app_create ...)
 
     #************** First, create the app ****************
 
+    # The PRJ file is one of the generated outputs.
+    #
+    # We make a copy of it, APP_PRJ_COPY, and use that as the custom
+    # command output because "make clean" will remove the specified
+    # output file. Vitis does not allow to create an app that already
+    # exists, but if the PRJ file is missing, Vitis is not able to
+    # remove the app.
+    #
+    # The other advantage to using APP_PRJ_COPY is that the file time
+    # of APP_PRJ is updated when building the app, so we cannot have
+    # the build custom command depend on APP_PRJ. Previously, the
+    # work-around was to introduce an intermediate custom target,
+    # ${TARGET_NAME}_create, that depended on ${APP_PRJ} and then have
+    # the build custom command depend on ${TARGET_NAME}_create. Now, we
+    # can instead have the build custom command depend on APP_PRJ_COPY.
+
+    set (APP_PRJ      "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${APP_NAME}.prj")
+    set (APP_PRJ_COPY "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/cmake.copy")
+
     # Create TCL file
     set (TCL_CREATE "${CMAKE_CURRENT_BINARY_DIR}/make-${APP_NAME}-create.tcl")
     file (WRITE  ${TCL_CREATE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
     # Set active platform
     file (APPEND ${TCL_CREATE} "platform active ${PLATFORM_NAME}\n")
+    # First, remove the application if it exists (i.e., if APP_PRJ exists).
+    # We could instead copy APP_PRJ to APP_PRJ_COPY, but that behavior would
+    # not be consistent with "make clean".
+    file (APPEND ${TCL_CREATE} "if { [file exists ${APP_PRJ}] } {\n")
+    file (APPEND ${TCL_CREATE} "  if { [catch {app remove ${APP_NAME}} errMsg ]} {\n")
+    file (APPEND ${TCL_CREATE} "    puts stderr \"app remove: $errMsg\"\n  }\n}\n")
     # Create app, using active platform (and domain); also creates sysproj ${APP_NAME}_system
     file (APPEND ${TCL_CREATE} "if { [catch {app create -name ${APP_NAME} -template {${TEMPLATE_NAME}}} errMsg ]} {\n")
-    file (APPEND ${TCL_CREATE} "  puts stderr \"app create: $errMsg\"\n}\n")
+    file (APPEND ${TCL_CREATE} "  puts stderr \"app create: $errMsg\"\n")
+    # If app creation was successful, copy APP_PRJ to APP_PRJ_COPY
+    file (APPEND ${TCL_CREATE} "} else {\n")
+    file (APPEND ${TCL_CREATE} "  file copy -force -- ${APP_PRJ} ${APP_PRJ_COPY}\n}\n")
 
-    # The PRJ file is one of the generated outputs
-    set (APP_PRJ "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${APP_NAME}.prj")
-
-    add_custom_command (OUTPUT ${APP_PRJ}
+    add_custom_command (OUTPUT ${APP_PRJ_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
                         COMMENT "Creating app ${APP_NAME}"
                         DEPENDS ${PLATFORM_NAME})
-
-    add_custom_target("${TARGET_NAME}_create" ALL
-                      DEPENDS ${APP_PRJ})
 
     #************** Next, build the app ****************
 
@@ -252,14 +274,13 @@ function (vitis_app_create ...)
     add_custom_command (OUTPUT ${APP_EXEC}
                         COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
                         COMMENT "Building app ${APP_NAME}"
-                        DEPENDS "${TARGET_NAME}_create" ${ADD_SOURCE})
+                        DEPENDS ${APP_PRJ_COPY} ${ADD_SOURCE})
 
     add_custom_target(${TARGET_NAME} ALL
                       DEPENDS ${APP_EXEC})
 
     set_property(TARGET ${TARGET_NAME}
-                 APPEND
-                 PROPERTY ADDITIONAL_CLEAN_FILES ${TCL_CREATE} ${TCL_BUILD})
+                 PROPERTY OUTPUT_NAME ${APP_EXEC})
 
   else ()
 
@@ -323,10 +344,6 @@ function (vitis_boot_create ...)
     add_custom_target(${BIF_NAME} ALL
                       DEPENDS ${BOOT_FILE})
 
-    set_property(TARGET ${BIF_NAME}
-                 APPEND
-                 PROPERTY ADDITIONAL_CLEAN_FILES ${BIF_FILE})
-
   else ()
 
     message (SEND_ERROR "vitis_boot_create: required parameter missing")
@@ -382,9 +399,5 @@ function (vitis_clean ...)
                     DEPENDS clean_output)
 
   set_target_properties(VitisClean PROPERTIES EXCLUDE_FROM_ALL ON)
-
-  set_property(TARGET VitisClean
-               APPEND
-               PROPERTY ADDITIONAL_CLEAN_FILES ${TCL_FILE})
 
 endfunction (vitis_clean)

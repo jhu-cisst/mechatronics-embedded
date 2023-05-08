@@ -40,7 +40,7 @@ vitis_app_create(
     BUILD_CONFIG   ${FSBL_CONFIG}
     COMPILER_FLAGS "FSBL_DEBUG_INFO")
 
-set (FSBL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${FSBL_NAME}/${FSBL_CONFIG}/${FSBL_NAME}.elf")
+get_property(FSBL_OUTPUT TARGET ${FSBL_NAME} PROPERTY OUTPUT_NAME)
 
 ########################## MFG_TEST App ############################
 
@@ -62,7 +62,7 @@ vitis_app_create(
     ADD_SOURCE     ${MFG_TEST_SOURCE}
     BUILD_CONFIG   ${MFG_TEST_CONFIG})
 
-set (MFG_TEST_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${MFG_TEST_NAME}/${MFG_TEST_CONFIG}/${MFG_TEST_NAME}.elf")
+get_property(MFG_TEST_OUTPUT TARGET ${MFG_TEST_NAME} PROPERTY OUTPUT_NAME)
 
 ######################## Echo Server App ##########################
 
@@ -79,7 +79,7 @@ vitis_app_create(
     ADD_SOURCE     ${ECHO_TEST_SOURCE}
     BUILD_CONFIG   ${ECHO_TEST_CONFIG})
 
-set (ECHO_TEST_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${ECHO_TEST_NAME}/${ECHO_TEST_CONFIG}/${ECHO_TEST_NAME}.elf")
+get_property(ECHO_TEST_OUTPUT TARGET ${ECHO_TEST_NAME} PROPERTY OUTPUT_NAME)
 
 ############################## Demo App ################################
 
@@ -98,7 +98,7 @@ vitis_app_create(
     DEL_SOURCE     ${DEMO_APP_DELETE}
     BUILD_CONFIG   ${DEMO_APP_CONFIG})
 
-set (DEMO_APP_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${DEMO_APP_NAME}/${DEMO_APP_CONFIG}/${DEMO_APP_NAME}.elf")
+get_property(DEMO_APP_OUTPUT TARGET ${DEMO_APP_NAME} PROPERTY OUTPUT_NAME)
 
 ########################### Boot Images #############################
 

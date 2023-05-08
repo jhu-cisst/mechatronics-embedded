@@ -10,7 +10,7 @@
 #
 # The vivado_block_build function creates a top-level TCL file, called
 # make-${PROJ_NAME}.tcl, that calls ${EXPORTED_TCL}, creates the top-level Verilog
-# wrapper, and generates the output files, including the final ${HW_FILE} used by Vitis
+# wrapper, and generates the output files, including the final ${HW_FILE} used by Vitis.
 #
 # The easiest way to make changes to the block design is to open the project file
 # ${PROJ_NAME}.xpr in the build directory, make the changes, and then export the
@@ -18,6 +18,7 @@
 # to update ${EXPORTED_TCL} in the repository.
 #
 # Function: vivado_block_build
+#
 # Parameters:
 #   - PROJ_NAME:         project name
 #   - BD_NAME:           board name
@@ -52,24 +53,32 @@ function (vivado_block_build ...)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  file(TO_NATIVE_PATH ${XILINX_VIVADO} VIVADO_NATIVE)
+  if (PROJ_NAME AND BD_NAME AND FPGA_PARTNUM AND EXPORTED_TCL AND HW_FILE)
 
-  # Create TCL file
-  set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${PROJ_NAME}.tcl")
-  file (WRITE  ${TCL_FILE} "create_project -force -part ${FPGA_PARTNUM} ${PROJ_NAME} ${CMAKE_CURRENT_BINARY_DIR}\n")
-  file (APPEND ${TCL_FILE} "create_bd_design ${BD_NAME}\n")
-  file (APPEND ${TCL_FILE} "source ${EXPORTED_TCL}\n")
-  file (APPEND ${TCL_FILE} "make_wrapper -top -files [get_files ${BD_NAME}.bd]\n")
-  file (APPEND ${TCL_FILE} "add_files ${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}.gen/sources_1/bd/${BD_NAME}/hdl/${BD_NAME}_wrapper.v\n")
-  file (APPEND ${TCL_FILE} "generate_target all [get_files ${BD_NAME}.bd]\n")
-  # Could add -minimal below
-  file (APPEND ${TCL_FILE} "write_hw_platform -fixed -force -file ${HW_FILE}\n")
+    file(TO_NATIVE_PATH ${XILINX_VIVADO} VIVADO_NATIVE)
 
-  add_custom_command (OUTPUT ${HW_FILE}
-                      COMMAND ${VIVADO_NATIVE} -mode batch -source ${TCL_FILE}
-                      DEPENDS ${EXPORTED_TCL})
+    # Create TCL file
+    set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${PROJ_NAME}.tcl")
+    file (WRITE  ${TCL_FILE} "create_project -force -part ${FPGA_PARTNUM} ${PROJ_NAME} ${CMAKE_CURRENT_BINARY_DIR}\n")
+    file (APPEND ${TCL_FILE} "create_bd_design ${BD_NAME}\n")
+    file (APPEND ${TCL_FILE} "source ${EXPORTED_TCL}\n")
+    file (APPEND ${TCL_FILE} "make_wrapper -top -files [get_files ${BD_NAME}.bd]\n")
+    file (APPEND ${TCL_FILE} "add_files ${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}.gen/sources_1/bd/${BD_NAME}/hdl/${BD_NAME}_wrapper.v\n")
+    file (APPEND ${TCL_FILE} "generate_target all [get_files ${BD_NAME}.bd]\n")
+    # Could add -minimal below
+    file (APPEND ${TCL_FILE} "write_hw_platform -fixed -force -file ${HW_FILE}\n")
 
-  add_custom_target(${PROJ_NAME} ALL
-                    DEPENDS ${HW_FILE})
+    add_custom_command (OUTPUT ${HW_FILE}
+                        COMMAND ${VIVADO_NATIVE} -mode batch -source ${TCL_FILE}
+                        DEPENDS ${EXPORTED_TCL})
+
+    add_custom_target(${PROJ_NAME} ALL
+                      DEPENDS ${HW_FILE})
+
+  else ()
+
+    message (SEND_ERROR "vivado_block_build: required parameter missing")
+
+  endif ()
 
 endfunction (vivado_block_build)
