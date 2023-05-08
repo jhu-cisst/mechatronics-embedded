@@ -1,12 +1,8 @@
 
 option (PETALINUX_MENU "Show Petalinux config menus" OFF)
 
-# Directory to custom configuration files, config and rootfs_config
+# Directory to custom configuration files: config, rootfs_config and bsp.cfg
 set (PETALINUX_CONFIG_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/configs")
-
-# Custom configuration files
-set (PETALINUX_CONFIG_FILES "${PETALINUX_CONFIG_DIR}/config"
-                            "${PETALINUX_CONFIG_DIR}/rootfs_config")
 
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")

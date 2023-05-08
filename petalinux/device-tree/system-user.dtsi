@@ -3,19 +3,20 @@
 };
 
 &gem0 {
-    local-mac-address = [fa 61 0e 00 00 00];
+    local-mac-address = [fa 61 0e 03 00 00];
     phy-handle = <&extphy0>;
+    gmii2rgmii-phy-handle = <&gmii_to_rgmii_0>;
     status = "okay";
-    xlnx,has-mdio = <0x1>;
-    psu_ethernet_0_mdio: mdio {
+    mdio {
         #address-cells = <1>;
         #size-cells = <0>;
-        extphy0: phy@1 {
-            compatible = "realtek,RTL8211F";
-            device_type = "ethernet-phy";
+        extphy0: ethernet-phy@1 {
+            compatible = "realtek,rtl8211f";
+            phy-mode = "rgmii-id";
             reg = <1>;
         };
-        gmii_to_rgmii_0: gmii_to_rgmii_0@8 {
+        gmii_to_rgmii_0@8 {
+            compatible = "xlnx,gmii-to-rgmii-1.0";
             phy-handle = <&extphy0>;
             reg = <8>;
         };
@@ -23,19 +24,20 @@
 };  
       
 &gem1 {
-    local-mac-address = [fa 61 0e 00 01 00];
+    local-mac-address = [fa 61 0e 03 01 00];
     phy-handle = <&extphy1>;
+    gmii2rgmii-phy-handle = <&gmii_to_rgmii_1>;
     status = "okay";
-    xlnx,has-mdio = <0x1>;
-    psu_ethernet_1_mdio: mdio {
+    mdio {
         #address-cells = <1>;
         #size-cells = <0>;
-        extphy1: phy@1 {
-            compatible = "realtek,RTL8211F";
-            device_type = "ethernet-phy";
+        extphy1: ethernet-phy@1 {
+            compatible = "realtek,rtl8211f";
+            phy-mode = "rgmii-id";
             reg = <1>;
         };
-        gmii_to_rgmii_1: gmii_to_rgmii_1@8 {
+        gmii_to_rgmii_1@8 {
+            compatible = "xlnx,gmii-to-rgmii-1.0";
             phy-handle = <&extphy1>;
             reg = <8>;
         };

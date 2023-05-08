@@ -19,12 +19,23 @@
 # Description:
 #   This function assumes that the sources for non-default configuration files
 #   are provided in the CONFIG_SRC_DIR directory and that the custom device-tree
-#   information is specified in DEVICE_TREE_FILES.
+#   information is specified in DEVICE_TREE_FILES. The CONFIG_SRC_DIR contains
+#   two files, config and rootfs_config, that are copied to the project-spec/configs
+#   directory in the build tree and one file, bsp.cfg, that is copied to the
+#   the project-spec/meta-user/recipes-kernel/linux/linux-xlnx directory in the
+#   build tree.
 #
-#   To change the configuration, set CONFIG_MENU ON via CMake. This will
-#   cause the system to show the configuration menus and update the files
-#   in the project-spec/configs sub-directory in the build tree.
-#   Note that this function only updates the "config" file;
+#   The bsp.cfg file contains custom kernel configuration entries that are not stored
+#   in "config" or "rootfs_config", but rather in generated files named "user_<date>.cfg"
+#   in the project-spec/meta-user/recipes-kernel/linux/linux-xlnx directory.
+#   It is easier, however, to put them in the existing "bsp.cfg" file, which
+#   is empty by default.
+#
+#   To change the configuration, set CONFIG_MENU ON via CMake. This will cause
+#   the system to show the configuration menus and update the files in the
+#   project-spec/configs and project-spec/meta-user/recipes-kernel/linux/linux-xlnx
+#   directories in the build tree.
+#   Note that this function only updates the "config" and "bsp.cfg" files;
 #   the "rootfs_config" is updated in petalinux_app_create and petalinux_build.
 #
 ##########################################################################################
@@ -140,6 +151,7 @@ function (petalinux_create ...)
     get_filename_component (HW_FILE_NAME ${HW_FILE} NAME)
 
     set (CONFIG_SRC_FILE     "${CONFIG_SRC_DIR}/config")
+    set (KERNEL_CFG_SRC      "${CONFIG_SRC_DIR}/bsp.cfg")
     set (DEVICE_TREE_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-bsp/device-tree/files")
 
     set (CONFIG_ARCHIVE_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-configs")
@@ -153,6 +165,7 @@ function (petalinux_create ...)
 
     set (CONFIG_BIN_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs")
     set (CONFIG_BIN_FILE  "${CONFIG_BIN_DIR}/config")
+    set (KERNEL_CFG_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-kernel/linux/linux-xlnx")
 
     # Output of petalinux-create
     set (PETALINUX_CREATE_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/config.project")
@@ -197,6 +210,11 @@ function (petalinux_create ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_OUTPUT}
+        # Copy the bsp.cfg file
+        COMMAND ${CMAKE_COMMAND}
+                  ARGS -E copy_if_different
+                  ${KERNEL_CFG_SRC}
+                  ${KERNEL_CFG_DIR}
         # Copy the device-tree file if needed
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
@@ -211,7 +229,7 @@ function (petalinux_create ...)
                 ${CONFIG_BIN_FILE}
                 ${PETALINUX_CONFIG_OUTPUT}
         COMMENT "Configuring Petalinux kernel"
-        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${DEVICE_TREE_FILES})
+        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${KERNEL_CFG_SRC} ${DEVICE_TREE_FILES})
 
     add_custom_target(${PROJ_NAME} ALL
                       COMMENT "Checking Petalinux creation and hardware/kernel configuration"
