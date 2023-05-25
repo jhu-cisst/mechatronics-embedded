@@ -43,3 +43,14 @@
         };
     };
 };  
+
+&qspi {
+    status = "okay";
+    flash@0 {
+        compatible = "winbond,w25q128", "jedec,spi-nor";
+        reg = <0x0>;
+        spi-max-frequency = <50000000>;
+        #address-cells = <1>;
+        #size-cells = <1>;
+    };
+};
