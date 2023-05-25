@@ -5,10 +5,11 @@
  * Application to initialize FPGA V3
  *
  * This program is auto-run at startup and does the following:
- *   1) Reads EMIO to determine board information
- *   2) Exports FPGAV3 environment variables (to shell)
- *   3) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
- *   4) Sets the Ethernet MAC and IP addresses
+ *   1) Reads FPGA serial number from QSPI
+ *   2) Reads EMIO to determine board information
+ *   3) Exports FPGAV3 environment variables (to shell)
+ *   4) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
+ *   5) Sets the Ethernet MAC and IP addresses
  */
 
 #include <stdio.h>
@@ -26,8 +27,11 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
+#include <mtd/mtd-user.h>
 
 // Some hard-coded values
+const size_t FPGA_SN_SIZE = 9;
+
 const unsigned int GPIO_BASE = 906;
 const unsigned int INDEX_EMIO_START = 54;
 const unsigned int INDEX_EMIO_END = 118;
@@ -36,6 +40,32 @@ const unsigned int INDEX_EMIO_END = 118;
 enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
 char *BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
 char *FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
+
+void GetFPGASerialNumber(char *sn)
+{
+    sn[0] = 0;   // Initialize to empty string
+
+    int fd = open("/dev/mtd4", O_RDONLY);
+    if (fd < 0) {
+        printf("fpgav3init: cannot open QSPI flash device\n");
+        return;
+    }
+
+    mtd_info_t mtd_info;
+    ioctl(fd, MEMGETINFO, &mtd_info);
+    printf("MTD type: %d, size: %d, erasesize: %d\n", (int)mtd_info.type,
+           mtd_info.size, mtd_info.erasesize);
+    // Format: "FPGA 1234-56" or "FPGA 1234-567", so maximum length is
+    //         14 bytes (9 bytes for S/N), including null termination.
+    char data[FPGA_SN_SIZE+5];
+    int n = read(fd, data, FPGA_SN_SIZE+5);
+    if (n == (FPGA_SN_SIZE+5)) {
+        data[FPGA_SN_SIZE+4] = 0;   // Make sure null-terminated
+        if (strncmp(data, "FPGA ", 5) == 0)
+            strcpy(sn, data+5);
+    }
+    close(fd);
+}
 
 bool EMIO_Init(bool do_export)
 {
@@ -292,6 +322,12 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
 int main(int argc, char **argv)
 {
     printf("*** FPGAV3 Initialization ***\n\n");
+
+    // Get FPGA Serial Number
+    char fpga_sn[FPGA_SN_SIZE];
+    GetFPGASerialNumber(fpga_sn);
+    if (fpga_sn[0])
+        printf("FPGA S/N: %s\n", fpga_sn);
 
     // Initialize EMIO interface
     if (!EMIO_Init(true))
