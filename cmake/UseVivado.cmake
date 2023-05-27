@@ -57,11 +57,40 @@ function (vivado_block_build ...)
 
     file(TO_NATIVE_PATH ${XILINX_VIVADO} VIVADO_NATIVE)
 
+    get_filename_component (EXPORTED_TCL_NAME ${EXPORTED_TCL} NAME)
+    set (EXPORTED_TCL_BIN "${CMAKE_CURRENT_BINARY_DIR}/${EXPORTED_TCL_NAME}")
+
+    # Put the version check here, since the code below (FILE_UPDATE) is what needs
+    # to be tested and possibly updated for different versions of Vivado.
+    if (NOT (${Vivado_VERSION} STREQUAL "2022.2" OR
+             ${Vivado_VERSION} STREQUAL "2023.1"))
+      message (WARNING "Vivado ${Vivado_VERSION} not yet tested")
+    endif ()
+
+    # For now, just replace version string in file, since the only substantive difference
+    # between the TCL files exported by Vivado 2022.2 and Vivado 2023.1 are the version string
+    # (other differences are reordering of some file content).
+    # The current REGEX will match any version between "2020" and "2025", with a ".1" or ".2" suffix,
+    # but this can be changed as needed. If file differences become more substantive, alternate solutions
+    # include using CMake configure_file or having version-specific TCL files in the source tree.
+    set (FILE_UPDATE "${CMAKE_CURRENT_BINARY_DIR}/make-update.cmake")
+    file (WRITE  ${FILE_UPDATE} "# Automatically generated\n")
+    file (APPEND ${FILE_UPDATE} "file (READ ${EXPORTED_TCL} FILE_CONTENTS)\n")
+    file (APPEND ${FILE_UPDATE}
+                 "string (REGEX REPLACE \"202[0-5].[1-2]\" ${Vivado_VERSION} FILE_CONTENTS \"\${FILE_CONTENTS}\")\n")
+    file (APPEND ${FILE_UPDATE} "file (WRITE ${EXPORTED_TCL_BIN} \"\${FILE_CONTENTS}\")\n")
+
+    add_custom_command (OUTPUT ${EXPORTED_TCL_BIN}
+                       COMMAND ${CMAKE_COMMAND}
+                       ARGS -P ${FILE_UPDATE}
+                       COMMENT "Updating ${EXPORTED_TCL_NAME}"
+                       DEPENDS ${EXPORTED_TCL})
+
     # Create TCL file
     set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${PROJ_NAME}.tcl")
     file (WRITE  ${TCL_FILE} "create_project -force -part ${FPGA_PARTNUM} ${PROJ_NAME} ${CMAKE_CURRENT_BINARY_DIR}\n")
     file (APPEND ${TCL_FILE} "create_bd_design ${BD_NAME}\n")
-    file (APPEND ${TCL_FILE} "source ${EXPORTED_TCL}\n")
+    file (APPEND ${TCL_FILE} "source ${EXPORTED_TCL_BIN}\n")
     file (APPEND ${TCL_FILE} "make_wrapper -top -files [get_files ${BD_NAME}.bd]\n")
     file (APPEND ${TCL_FILE} "add_files ${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}.gen/sources_1/bd/${BD_NAME}/hdl/${BD_NAME}_wrapper.v\n")
     file (APPEND ${TCL_FILE} "generate_target all [get_files ${BD_NAME}.bd]\n")
@@ -70,7 +99,7 @@ function (vivado_block_build ...)
 
     add_custom_command (OUTPUT ${HW_FILE}
                         COMMAND ${VIVADO_NATIVE} -mode batch -source ${TCL_FILE}
-                        DEPENDS ${EXPORTED_TCL})
+                        DEPENDS ${EXPORTED_TCL_BIN})
 
     add_custom_target(${PROJ_NAME} ALL
                       DEPENDS ${HW_FILE})
