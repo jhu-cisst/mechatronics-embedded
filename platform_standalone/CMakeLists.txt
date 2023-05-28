@@ -7,12 +7,20 @@ else (BUILD_FPGAV30)
   set (PLATFORM_STANDALONE "FpgaV31Standalone")
 endif (BUILD_FPGAV30)
 
-# Libraries to include (xilffs required for fsbl, lwip211 for echo)
-set (BSP_LIBRARIES "xilffs" "xilrsa" "lwip211")
+# Vitis 2022.x uses lwip211. Vitis 2023.1 uses lwip213.
+if (Vitis_VERSION_MAJOR EQUAL 2022)
+  set (LWIP_LIB "lwip211")
+else ()
+  set (LWIP_LIB "lwip213")
+endif ()
 
 # Patch to lwIP library needed for RTL8211F
 set (LWIP_PATCH_FILES
-     "${CMAKE_CURRENT_SOURCE_DIR}/bsp_lib_src/lwip211/xemacpsif_physpeed.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/bsp_lib_src/${LWIP_LIB}/xemacpsif_physpeed.c")
+
+# Libraries to include (xilffs required for fsbl, lwip for echo)
+set (BSP_LIBRARIES "xilffs" "xilrsa" ${LWIP_LIB})
+
 
 vitis_platform_create(
     PLATFORM_NAME     ${PLATFORM_STANDALONE}
