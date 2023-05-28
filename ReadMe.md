@@ -48,3 +48,8 @@ Vitis 2022.2 already contains CMake V3.3.2, which is used if the Xilinx
 `settings64.sh` file is sourced before calling CMake. Note that it is not necessary to
 source `settings64.sh`, as long as the paths to Vivado and Vitis (xcst) are specified via
 the CMake GUI.
+
+Petalinux 2022.2 specifies that the following packages should be installed (`apt-get install`):
+iproute2 gawk python3 python build-essential gcc git make net-tools libncurses5-dev tftpd zlib1g-dev libssl-dev flex bison libselinux1 gnupg wget git-core diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib automake zlib1g:i386 screen pax gzip cpio python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3
+
+Petalinux 2023.1 requires zstd to be installed (this is not documented), in addition to the packages required by Petalinux 2022.2.

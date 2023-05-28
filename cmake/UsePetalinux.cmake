@@ -167,13 +167,11 @@ function (petalinux_create ...)
     set (CONFIG_BIN_FILE  "${CONFIG_BIN_DIR}/config")
     set (KERNEL_CFG_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-kernel/linux/linux-xlnx")
 
-    # Output of petalinux-create
-    set (PETALINUX_CREATE_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/config.project")
     # Output of petalinux-config (hardware)
     set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
 
     add_custom_command (
-        OUTPUT ${PETALINUX_CREATE_OUTPUT} ${PETALINUX_CONFIG_HW_OUTPUT}
+        OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
         # Create the project. This does not take very long.
         COMMAND petalinux-create -t project --force --template zynq -n ${PROJ_NAME}
         # Archive default versions of config and rootfs_config
