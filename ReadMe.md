@@ -4,8 +4,8 @@ This repository contains the embedded software for the Zynq 7000 SoC used in the
 [FPGA1394 V3](https://github.com/jhu-cisst/FPGA1394) board.
 The build process is implemented using CMake to invoke the Xilinx build tools, including
 Vivado, Vitis and (on Linux only) Petalinux.
-It has been tested with Vivado/Vitis 2022.2 on Windows 10 (with Visual Studio 2017) and
-with Vivado/Vitis/Petalinux 2022.2 on Ubuntu 20.04 (see below).
+It has been tested with Vivado/Vitis 2022.2 and 2023.1 on Windows 10 (with Visual Studio 2017) and
+with Vivado/Vitis/Petalinux 2022.2 and 2023.1 on Ubuntu 20.04 (see below).
 
 The Zynq 7000 SoC contains both a processor (PS) and FGPA (programmable logic, PL).
 The code in this repository targets the PS. The PL firmware, which is written in Verilog,
@@ -44,7 +44,7 @@ Note that Steps 2 and 3 overlap and could be done in the opposite order.
 It is necessary to install `libtinfo5`, e.g., `sudo apt install libtinfo5` in addition
 to the usual development tools.
 
-Vitis 2022.2 already contains CMake V3.3.2, which is used if the Xilinx
+Vitis 2022.2 and 2023.1 already contain CMake V3.3.2, which is used if the Xilinx
 `settings64.sh` file is sourced before calling CMake. Note that it is not necessary to
 source `settings64.sh`, as long as the paths to Vivado and Vitis (xcst) are specified via
 the CMake GUI.
