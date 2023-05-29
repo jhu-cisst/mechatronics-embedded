@@ -3,6 +3,14 @@ option (PETALINUX_MENU "Show Petalinux config menus" OFF)
 
 # Directory to custom configuration files: config, rootfs_config and bsp.cfg
 set (PETALINUX_CONFIG_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/configs")
+if (Petalinux_VERSION STREQUAL "2022.2")
+  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2022.2")
+else ()
+  if (NOT Petalinux_VERSION STREQUAL "2023.1")
+    message (WARNING "Petalinux ${Petalinux_VERSION} not supported -- using config files from 2023.1")
+  endif ()
+  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2023.1")
+endif ()
 
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
@@ -10,7 +18,8 @@ set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.
 petalinux_create(PROJ_NAME          "fpgav3"
                  HW_FILE            ${HW_XSA_FILE}
                  CONFIG_MENU        ${PETALINUX_MENU}
-                 CONFIG_SRC_DIR     ${PETALINUX_CONFIG_DIR}
+                 CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
+                 BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE})
 
 set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.c"
@@ -28,6 +37,6 @@ set (PETALINUX_BUILD_DEPS "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPE
 petalinux_build(TARGET_NAME         "fpgav3_build"
                 PROJ_NAME           "fpgav3"
                 CONFIG_MENU         ${PETALINUX_MENU}
-                CONFIG_SRC_DIR      ${PETALINUX_CONFIG_DIR}
+                ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                 BIT_FILE            ${BIT_FILE}
                 DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
