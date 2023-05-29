@@ -167,11 +167,11 @@ function (petalinux_create ...)
     set (CONFIG_BIN_FILE  "${CONFIG_BIN_DIR}/config")
     set (KERNEL_CFG_DIR   "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-kernel/linux/linux-xlnx")
 
-    # Output of petalinux-config (hardware)
-    set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
+    # Output of petalinux-create -- we rely on two files that we create
+    set (PETALINUX_CREATE_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.default" "${CONFIG_ARCHIVE_DIR}/rootfs_config.default")
 
     add_custom_command (
-        OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
+        OUTPUT ${PETALINUX_CREATE_OUTPUT}
         # Create the project. This does not take very long.
         COMMAND petalinux-create -t project --force --template zynq -n ${PROJ_NAME}
         # Archive default versions of config and rootfs_config
@@ -183,6 +183,13 @@ function (petalinux_create ...)
                 ARGS -E copy_if_different
                 "${CONFIG_BIN_DIR}/rootfs_config"
                 "${CONFIG_ARCHIVE_DIR}/rootfs_config.default"
+        COMMENT "Creating Petalinux project ${PROJ_NAME}")
+
+    # Output of petalinux-config (hardware)
+    set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
+
+    add_custom_command (
+        OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
         # Copy the config file from the source tree (rootfs_config is copied in petalinux_build)
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
@@ -197,11 +204,11 @@ function (petalinux_create ...)
                 ARGS -E copy_if_different
                 "${CONFIG_BIN_DIR}/config"
                 "${CONFIG_ARCHIVE_DIR}/config.hw"
-        COMMENT "Creating Petalinux project ${PROJ_NAME} and configuring hardware from ${HW_FILE_NAME}"
+        COMMENT "Configuring hardware from ${HW_FILE_NAME}"
         # Adding dependency on ${CONFIG_SRC_FILE} forces a complete rebuild if the config file is
         # changed, even though in many cases it would not be necessary (i.e., it is only necessary
         # if one of the hw-description entries is updated).
-        DEPENDS ${HW_FILE} ${CONFIG_SRC_FILE})
+        DEPENDS ${PETALINUX_CREATE_OUTPUT} ${HW_FILE} ${CONFIG_SRC_FILE})
 
     # Output from configuring kernel
     set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.cfg")
