@@ -66,11 +66,18 @@ if (USE_VITIS)
 
   if (Vitis_FOUND)
 
-    include(${VITIS_USE_FILE})
+    if (Vivado_FOUND AND NOT Vitis_VERSION STREQUAL Vivado_VERSION)
 
-    add_subdirectory(platform_standalone)
+      message (SEND_ERROR "Vitis ${Vitis_VERSION} is not compatible with Vivado ${Vivado_VERSION}")
 
-    add_subdirectory(platform_linux)
+    else ()
+
+      include(${VITIS_USE_FILE})
+
+      add_subdirectory(platform_standalone)
+
+      add_subdirectory(platform_linux)
+    endif ()
 
   else (Vitis_FOUND)
 
@@ -86,9 +93,19 @@ if (USE_PETALINUX)
 
   if (Petalinux_FOUND)
 
-    include(${PETALINUX_USE_FILE})
+    # Could also check if Vitis_VERSION is different from Petalinux_VERSION, but not so
+    # important because those tools currently do not depend on each other.
+    if (Vivado_FOUND AND NOT Petalinux_VERSION STREQUAL Vivado_VERSION)
 
-    add_subdirectory(petalinux)
+      message (SEND_ERROR "Petalinux ${Petalinux_VERSION} is not compatible with Vivado ${Vivado_VERSION}")
+
+    else ()
+
+      include(${PETALINUX_USE_FILE})
+
+      add_subdirectory(petalinux)
+
+    endif ()
 
   else (Petalinux_FOUND)
 
