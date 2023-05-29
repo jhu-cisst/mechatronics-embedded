@@ -424,6 +424,9 @@ function (petalinux_build ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE}
+        # petalinux-build does not automatically restore image.ub to the images/linux
+        # directory, but it works if we first clean the kernel build and then rebuild.
+        COMMAND petalinux-build -p ${PROJ_NAME} -c kernel -x clean
         COMMAND petalinux-build -p ${PROJ_NAME}
         COMMENT "Building petalinux"
         DEPENDS ${PETALINUX_ROOTFS_OUTPUT} ${DEPENDENCIES})
