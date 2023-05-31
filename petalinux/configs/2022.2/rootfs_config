@@ -3893,6 +3893,7 @@ CONFIG_Init-manager-sysvinit=y
 # apps 
 #
 CONFIG_fpgav3init=y
+CONFIG_fpgav3sn=y
 
 #
 # user packages 

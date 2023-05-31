@@ -7,7 +7,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
+#include <fcntl.h>
 
 // Format: FPGA 1234-56 (12 bytes) or FPGA 1234-567 (13 bytes).
 // Note that on PROM, the string is terminated by 0xff because the sector
@@ -28,9 +30,12 @@ void GetFPGASerialNumber(char *sn)
     char data[5];
     int n = read(fd, data, 5);
     if ((n == 5) && (strncmp(data, "FPGA ", 5) == 0)) {
-        read(fd, sn, FPGA_SN_SIZE);
+        read(fd, sn, FPGA_SN_SIZE-1);
         char *p = strchr(sn, 0xff);
-        if (p) *p = 0;      // Null terminate at first 0xff
+        if (p)
+            *p = 0;                  // Null terminate at first 0xff
+        else
+            sn[FPGA_SN_SIZE-1] = 0;  // or at end of string
     }
     close(fd);
 }
@@ -48,6 +53,10 @@ bool ProgramFPGASerialNumber(const char *sn)
         return false;
     }
     size_t sn_len = strlen(sn);
+    if (sn_len >= FPGA_SN_SIZE) {
+        printf("ProgramFPGASerialNumber: S/N too long (limit = %ld characters)\n", FPGA_SN_SIZE-1);
+        return false;
+    }
     n = write(fd, sn, sn_len);
     if (n != sn_len) {
         printf("ProgramFPGASerialNumber: error writing S/N %s to QSPI flash device\n", sn);
