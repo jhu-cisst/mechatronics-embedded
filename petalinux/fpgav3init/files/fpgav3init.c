@@ -30,8 +30,6 @@
 #include <mtd/mtd-user.h>
 
 // Some hard-coded values
-const size_t FPGA_SN_SIZE = 9;
-
 const unsigned int GPIO_BASE = 906;
 const unsigned int INDEX_EMIO_START = 54;
 const unsigned int INDEX_EMIO_END = 118;
@@ -41,28 +39,34 @@ enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
 char *BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
 char *FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
 
-void GetFPGASerialNumber(char *sn)
+// GetFpgaSerialNumber is duplicated in fpgav3init.c and fpgav3sn.c.
+// Eventually, this function (and others) can be moved to a shared library.
+
+// Format: FPGA 1234-56 (12 bytes) or FPGA 1234-567 (13 bytes).
+// Note that on PROM, the string is terminated by 0xff because the sector
+// is first erased (all bytes set to 0xff) before the string is written.
+// Maximum length of S/N is 9 bytes, including null termination.
+const size_t FPGA_SN_SIZE = 9;
+
+void GetFpgaSerialNumber(char *sn)
 {
     sn[0] = 0;   // Initialize to empty string
 
-    int fd = open("/dev/mtd4", O_RDONLY);
+    int fd = open("/dev/mtd4ro", O_RDONLY);
     if (fd < 0) {
-        printf("fpgav3init: cannot open QSPI flash device\n");
+        printf("GetFpgaSerialNumber: cannot open QSPI flash device\n");
         return;
     }
 
-    mtd_info_t mtd_info;
-    ioctl(fd, MEMGETINFO, &mtd_info);
-    printf("MTD type: %d, size: %d, erasesize: %d\n", (int)mtd_info.type,
-           mtd_info.size, mtd_info.erasesize);
-    // Format: "FPGA 1234-56" or "FPGA 1234-567", so maximum length is
-    //         14 bytes (9 bytes for S/N), including null termination.
-    char data[FPGA_SN_SIZE+5];
-    int n = read(fd, data, FPGA_SN_SIZE+5);
-    if (n == (FPGA_SN_SIZE+5)) {
-        data[FPGA_SN_SIZE+4] = 0;   // Make sure null-terminated
-        if (strncmp(data, "FPGA ", 5) == 0)
-            strcpy(sn, data+5);
+    char data[5];
+    int n = read(fd, data, 5);
+    if ((n == 5) && (strncmp(data, "FPGA ", 5) == 0)) {
+        read(fd, sn, FPGA_SN_SIZE-1);
+        char *p = strchr(sn, 0xff);
+        if (p)
+            *p = 0;                  // Null terminate at first 0xff
+        else
+            sn[FPGA_SN_SIZE-1] = 0;  // or at end of string
     }
     close(fd);
 }
@@ -267,7 +271,7 @@ bool ProgramFpga(const char *firmwareName)
 }
 
 // Export FPGA information as shell variables
-bool ExportFpgaInfo(char *fpga_ver, char *board_type, unsigned int board_id)
+bool ExportFpgaInfo(char *fpga_ver, char *fpga_sn, char *board_type, unsigned int board_id)
 {
     mode_t mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
     int fd = open("/etc/profile.d/fpgav3.sh", O_WRONLY|O_CREAT|O_TRUNC, mode);
@@ -278,6 +282,10 @@ bool ExportFpgaInfo(char *fpga_ver, char *board_type, unsigned int board_id)
     char buf[64];
     sprintf(buf, "export FPGAV3_VER=%s\n", fpga_ver);
     write(fd, buf, strlen(buf)+1);
+    if (fpga_sn[0]) {
+        sprintf(buf, "export FPGAV3_SN=%s\n", fpga_sn);
+        write(fd, buf, strlen(buf)+1);
+    }
     sprintf(buf, "export FPGAV3_HW=%s\n", board_type);
     write(fd, buf, strlen(buf)+1);
     if (board_id < 16) {
@@ -325,7 +333,7 @@ int main(int argc, char **argv)
 
     // Get FPGA Serial Number
     char fpga_sn[FPGA_SN_SIZE];
-    GetFPGASerialNumber(fpga_sn);
+    GetFpgaSerialNumber(fpga_sn);
     if (fpga_sn[0])
         printf("FPGA S/N: %s\n", fpga_sn);
 
@@ -384,7 +392,7 @@ int main(int argc, char **argv)
     fpga_ver[1] = '.';
     fpga_ver[2] = isV30 ? '0' : '1';
     fpga_ver[3] = '\0';
-    ExportFpgaInfo(fpga_ver, BoardName[board_type], board_id);
+    ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type], board_id);
 
     if (strlen(FirmwareName[board_type]) > 0) {
         ProgramFpga(FirmwareName[board_type]);
