@@ -6,9 +6,12 @@ cmake_minimum_required(VERSION 3.16)
 
 project(FpgaBoard NONE)
 
-set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (EMBEDDED_VERSION_MAJOR 1)
+set (EMBEDDED_VERSION_MINOR 0)
+set (EMBEDDED_VERSION_PATCH 0)
+set (EMBEDDED_VERSION "${EMBEDDED_VERSION_MAJOR}.${EMBEDDED_VERSION_MINOR}.${EMBEDDED_VERSION_PATCH}")
 
-find_file (BIT_FILE "FPGA1394V3-BCFG.bit" DOC "FPGA compiled firmware, FPGA1394V3-BCFG.bit")
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON)
 
@@ -25,13 +28,30 @@ endif (WIN32)
 option (BUILD_FPGAV30 "Build for FPGA V3.0 (instead of V3.1)" OFF)
 mark_as_advanced (BUILD_FPGAV30)
 
+find_package (mechatronics-firmware)
+
+if (mechatronics-firmware_FOUND)
+
+  set (BIT_FILE ${FPGAV3_BCFG_BIT_FILE})
+
+else ()
+
+  message (STATUS "mechatronics-firmware not found -- manually specify BIT_FILE")
+  find_file (BIT_FILE_MANUAL "FPGA1394V3-BCFG.bit" DOC "FPGA compiled firmware, FPGA1394V3-BCFG.bit")
+  set (BIT_FILE ${BIT_FILE_MANUAL})
+
+endif ()
+
+set (Xilinx_VERSION "")
+
 if (USE_VIVADO)
 
-  find_package(Vivado)
+  find_package (Vivado)
 
   if (Vivado_FOUND)
 
     include(${VIVADO_USE_FILE})
+    set (Xilinx_VERSION ${Vivado_VERSION})
 
     if (BUILD_FPGAV30)
       set (BLOCK_DESIGN_NAME "FpgaV30BlockDesign")
@@ -41,15 +61,15 @@ if (USE_VIVADO)
       set (HW_XSA_FILE  "${CMAKE_CURRENT_BINARY_DIR}/block_design/FpgaV31.xsa")
     endif (BUILD_FPGAV30)
 
-    add_subdirectory(block_design)
+    add_subdirectory (block_design)
 
-  else (Vivado_FOUND)
+  else ()
 
     message(SEND_ERROR "Xilinx Vivado not found")
 
-  endif (Vivado_FOUND)
+  endif ()
 
-else (USE_VIVADO)
+else ()
 
   set (BLOCK_DESIGN_NAME "")
   if (BUILD_FPGAV30)
@@ -58,7 +78,7 @@ else (USE_VIVADO)
     find_file (HW_XSA_FILE "FpgaV31.xsa" DOC "XSA file produced by Vivado")
   endif (BUILD_FPGAV30)
 
-endif (USE_VIVADO)
+endif ()
 
 if (USE_VITIS)
 
@@ -72,45 +92,72 @@ if (USE_VITIS)
 
     else ()
 
+      set (Xilinx_VERSION ${Vitis_VERSION})
       include(${VITIS_USE_FILE})
 
-      add_subdirectory(platform_standalone)
+      add_subdirectory (platform_standalone)
 
-      add_subdirectory(platform_linux)
+      add_subdirectory (platform_linux)
+
     endif ()
 
-  else (Vitis_FOUND)
+  else ()
 
     message(SEND_ERROR "Xilinx Vitis not found")
 
-  endif (Vitis_FOUND)
+  endif ()
 
-endif (USE_VITIS)
+endif ()
 
 if (USE_PETALINUX)
 
-  find_package(Petalinux)
+  find_package (Petalinux)
 
   if (Petalinux_FOUND)
 
-    # Could also check if Vitis_VERSION is different from Petalinux_VERSION, but not so
-    # important because those tools currently do not depend on each other.
     if (Vivado_FOUND AND NOT Petalinux_VERSION STREQUAL Vivado_VERSION)
 
       message (SEND_ERROR "Petalinux ${Petalinux_VERSION} is not compatible with Vivado ${Vivado_VERSION}")
 
+    elseif (Vitis_FOUND AND NOT Petalinux_VERSION STREQUAL Vitis_VERSION)
+
+      message (SEND_ERROR "Petalinux ${Petalinux_VERSION} is not compatible with Vitis ${Vitis_VERSION}")
+
     else ()
 
-      include(${PETALINUX_USE_FILE})
+      set (Xilinx_VERSION ${Petalinux_VERSION})
+      include (${PETALINUX_USE_FILE})
 
-      add_subdirectory(petalinux)
+      add_subdirectory (petalinux)
 
     endif ()
 
-  else (Petalinux_FOUND)
+  else ()
 
-    message(WARNING "Petalinux image will not be built because tools not found")
+    message (WARNING "Petalinux image will not be built because tools not found")
 
-  endif (Petalinux_FOUND)
+  endif ()
 
-endif (USE_PETALINUX)
+endif ()
+
+#
+# Write a simple mechatronics-embedded-config.cmake file
+#
+set (CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/mechatronics-embedded-config.cmake")
+file (WRITE  ${CONFIG_FILE} "#\n# CMake configuration file for mechatronics-embedded\n#\n\n")
+file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_MAJOR ${EMBEDDED_VERSION_MAJOR})\n")
+file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_MINOR ${EMBEDDED_VERSION_MINOR})\n")
+file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_PATCH ${EMBEDDED_VERSION_PATCH})\n")
+file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION       \"${EMBEDDED_VERSION}\")\n\n")
+if (mechatronics-firmware_FOUND)
+  file (APPEND ${CONFIG_FILE} "set (FIRMWARE_VERSION ${FIRMWARE_VERSION})\n\n")
+endif ()
+if (BUILD_FPGAV30)
+  file (APPEND ${CONFIG_FILE} "set (FPGA_VERSION \"3.0\")\n")
+else ()
+  file (APPEND ${CONFIG_FILE} "set (FPGA_VERSION \"3.1\")\n")
+endif ()
+file (APPEND ${CONFIG_FILE} "set (USE_VIVADO     ${USE_VIVADO})\n")
+file (APPEND ${CONFIG_FILE} "set (USE_VITIS      ${USE_VITIS})\n")
+file (APPEND ${CONFIG_FILE} "set (USE_PETALINUX  ${USE_PETALINUX})\n\n")
+file (APPEND ${CONFIG_FILE} "set (Xilinx_VERSION ${Xilinx_VERSION})\n")
