@@ -120,6 +120,8 @@ u32 FsblHookBeforeHandoff(void)
     uint32_t hw_version = Xil_In32(XPS_GPIO_BASEADDR+0x0000006c);
     if (hw_version == 0x42434647) {   // "BCFG"
         uint32_t board_status = Xil_In32(XPS_GPIO_BASEADDR+0x00000068);
+        unsigned int board_id = (board_status&0x0f000000)>>24;
+        xil_printf("Board ID: %d\r\n", board_id);
         xil_printf("Board status: %x", board_status);
         if (board_status&0x00800000) xil_printf(", No board");
         if (board_status&0x00400000) xil_printf(", QLA");
