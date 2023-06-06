@@ -55,8 +55,10 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
 
   file (MAKE_DIRECTORY ${SD_IMAGE_DIR})
   set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
-  file (WRITE  ${VERSION_FILE} "mechatronics-embedded ${EMBEDDED_VERSION}\n")
+  file (WRITE   ${VERSION_FILE} "mechatronics-embedded ${EMBEDDED_VERSION}\n")
   file (APPEND  ${VERSION_FILE} "mechatronics-firmware ${FIRMWARE_VERSION}\n")
+  file (APPEND  ${VERSION_FILE} "fpga                  ${FPGA_VERSION}\n")
+  file (APPEND  ${VERSION_FILE} "xilinx-tools          ${Xilinx_VERSION}\n")
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/fpgav3/images/linux")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")

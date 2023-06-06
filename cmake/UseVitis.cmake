@@ -40,11 +40,12 @@
 #   - ADD_SOURCE      Additional source files (optional)
 #   - DEL_SOURCE      Source files to delete (optional)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
-#   - COMPILER_FLAGS  Compiler flags (optional)
+#   - COMPILER_FLAGS  Compiler flags (optional), prepend with '/' to remove
 #
 # Description:
 #   This function creates an application from the specified template and then
-#   builds it.
+#   builds it. Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
+#   causes that compiler option to be removed.
 #
 ##########################################################################################
 #
@@ -267,7 +268,14 @@ function (vitis_app_create ...)
     file (APPEND ${TCL_BUILD} "  puts stderr \"app build-config: $errMsgCfg\"\n}\n")
     # Set compiler flags
     foreach (flag ${COMPILER_FLAGS})
-      file (APPEND ${TCL_BUILD} "if { [catch {app config -name ${APP_NAME} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
+      string (SUBSTRING ${flag} 0 1 flag0)
+      if (flag0 STREQUAL "/")
+        set (REMOVE_FLAG "-remove")
+        string (SUBSTRING ${flag} 1 -1 flag)
+      else ()
+        set (REMOVE_FLAG "")
+      endif ()
+      file (APPEND ${TCL_BUILD} "if { [catch {app config -name ${APP_NAME} ${REMOVE_FLAG} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
       file (APPEND ${TCL_BUILD} "  puts stderr \"app config: $errMsgFlag\"\n}\n")
     endforeach (flag)
     # Compile app

@@ -40,13 +40,14 @@ set (FSBL_CONFIG "Release")
 set (FSBL_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c")
 
+# Specify /FSBL_DEBUG_INFO to remove that compiler option
 vitis_app_create(
     APP_NAME       ${FSBL_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "Zynq FSBL"
     ADD_SOURCE     ${FSBL_SOURCE}
     BUILD_CONFIG   ${FSBL_CONFIG}
-    COMPILER_FLAGS "FSBL_DEBUG_INFO")
+    COMPILER_FLAGS "/FSBL_DEBUG_INFO")
 
 get_property(FSBL_OUTPUT TARGET ${FSBL_NAME} PROPERTY OUTPUT_NAME)
 

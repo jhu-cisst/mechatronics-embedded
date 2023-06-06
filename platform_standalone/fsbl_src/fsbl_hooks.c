@@ -114,15 +114,24 @@ u32 FsblHookBeforeHandoff(void)
      */
     fsbl_printf(DEBUG_INFO,"In FsblHookBeforeHandoff function \r\n");
 
+    xil_printf("\r\n*** FPGA V3 ***\r\n\n");
+
     // Check connected board
-    uint32_t board_status = Xil_In32(XPS_GPIO_BASEADDR+0x00000068);
-    xil_printf("Board status: %x", board_status);
-    if (board_status&0x00800000) xil_printf(", No board");
-    if (board_status&0x00400000) xil_printf(", QLA");
-    if (board_status&0x00200000) xil_printf(", DQLA");
-    if (board_status&0x00100000) xil_printf(", DRAC");
-    if (board_status&0x00080000) xil_printf(", V3.0");
-    xil_printf("\r\n");
+    uint32_t hw_version = Xil_In32(XPS_GPIO_BASEADDR+0x0000006c);
+    if (hw_version == 0x42434647) {   // "BCFG"
+        uint32_t board_status = Xil_In32(XPS_GPIO_BASEADDR+0x00000068);
+        xil_printf("Board status: %x", board_status);
+        if (board_status&0x00800000) xil_printf(", No board");
+        if (board_status&0x00400000) xil_printf(", QLA");
+        if (board_status&0x00200000) xil_printf(", DQLA");
+        if (board_status&0x00100000) xil_printf(", DRAC");
+        // Check for V3.0 takes some time, so not valid yet
+        // if (board_status&0x00080000) xil_printf(", V3.0");
+        xil_printf("\r\n");
+    }
+    else {
+        xil_printf("Did not find BCFG firmware: %x\r\n", hw_version);
+    }
 
     return (Status);
 }
