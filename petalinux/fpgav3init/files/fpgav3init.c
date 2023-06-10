@@ -9,7 +9,8 @@
  *   2) Reads EMIO to determine board information
  *   3) Exports FPGAV3 environment variables (to shell)
  *   4) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
- *   5) Sets the Ethernet MAC and IP addresses
+ *   5) Copies qspi-boot.bin to flash if different
+ *   6) Sets the Ethernet MAC and IP addresses
  */
 
 #include <stdio.h>
@@ -225,21 +226,10 @@ bool FpgaLoad(const char *binFile)
 
 bool ProgramFpga(const char *firmwareName)
 {
-    printf("Mounting SD card\n");
-    if (mount("/dev/mmcblk0p1", "/media", "vfat", 0L, NULL) != 0) {
-        printf("Failed to mount SD card\n");
-        return false;
-    }
-
     // Copy bit file from /media to /tmp
     char bitFile[32];
     sprintf(bitFile, "%s.bit", firmwareName);
     CopyFile(bitFile, "/media", "/tmp");
-
-    // Unmount SD card from /media
-    if (umount("/media")  != 0) {
-        printf("Warning: failed to unmount SD card\n");
-    }
 
     // Create bin file in /tmp
     printf("Converting bitstream %s\n", bitFile);
@@ -268,6 +258,88 @@ bool ProgramFpga(const char *firmwareName)
 
     printf("Loading bitstream to FPGA\n");
     return FpgaLoad(binFile);
+}
+
+// Program QSPI flash
+//
+//   This function writes the specified file (fileName) to the specified QSPI
+//   flash partition (devName). To avoid unecessary erase/write cycles, it
+//   checks (sector-by-sector) whether the file contents are already present
+//   in the flash partition.
+
+bool ProgramFlash(const char *fileName, const char *devName)
+{
+    int fdFile = open(fileName, O_RDONLY);
+    if (fdFile < 0) {
+        printf("ProgramFlash: cannot open file %s\n", fileName);
+        return false;
+    }
+
+    int fdFlash = open(devName, O_RDWR);
+    if (fdFlash < 0) {
+        printf("ProgramFlash: cannot open QSPI flash device %s\n", devName);
+        close(fdFile);
+        return false;
+    }
+
+    // Get flash info
+    mtd_info_t mtd_info;
+    ioctl(fdFlash, MEMGETINFO, &mtd_info);
+
+    // Allocate buffers to hold contents of a sector (mtd_info.erasesize)
+    char *fileBuf = (char *) malloc(mtd_info.erasesize);
+    char *devBuf  = (char *) malloc(mtd_info.erasesize);
+    if (!fileBuf || !devBuf) {
+        printf("ProgramFlash: failed to allocate buffer of size %d\n", mtd_info.erasesize);
+        free(fileBuf);
+        free(devBuf);
+        close(fdFile);
+        close(fdFlash);
+        return false;
+    }
+
+    // Get file size
+    struct stat src_stat;
+    fstat(fdFile, &src_stat);
+
+    // Now, loop through number of sectors and check whether data in sector needs
+    // to be updated.
+    unsigned int numSame = 0;
+    unsigned int numDiff = 0;
+    erase_info_t ei;
+    ei.length = mtd_info.erasesize;
+    for (size_t nBytes = 0; nBytes < src_stat.st_size; nBytes += mtd_info.erasesize) {
+        size_t bytesLeft = src_stat.st_size - nBytes;
+        size_t nb = (bytesLeft < mtd_info.erasesize) ? bytesLeft : mtd_info.erasesize;
+        read(fdFile, fileBuf, nb);
+        read(fdFlash, devBuf, nb);
+        if (memcmp(fileBuf, devBuf, nb) == 0) {
+            numSame++;
+        }
+        else {
+            numDiff++;
+            // Back up in device file
+            lseek(fdFlash, -nb, SEEK_CUR);
+            // Erase sector
+            ei.start = nBytes;
+            ioctl(fdFlash, MEMUNLOCK, &ei);
+            ioctl(fdFlash, MEMERASE, &ei);
+            // write new contents
+            write(fdFlash, fileBuf, nb);
+        }
+    }
+    if (numDiff == 0) {
+        printf("ProgramFlash:  %s already present in %s\n", fileName, devName);
+    }
+    else {
+        printf("ProgramFlash:  updated %s in %s (%d of %d sectors)\n", fileName,
+               devName, numDiff, (numSame+numDiff));
+    }
+    free(fileBuf);
+    free(devBuf);
+    close(fdFile);
+    close(fdFlash);
+    return true;
 }
 
 // Export FPGA information as shell variables
@@ -394,8 +466,22 @@ int main(int argc, char **argv)
     fpga_ver[3] = '\0';
     ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type], board_id);
 
-    if (strlen(FirmwareName[board_type]) > 0) {
-        ProgramFpga(FirmwareName[board_type]);
+    printf("Mounting SD card\n");
+    if (mount("/dev/mmcblk0p1", "/media", "vfat", 0L, NULL) == 0) {
+
+        if (strlen(FirmwareName[board_type]) > 0)
+            ProgramFpga(FirmwareName[board_type]);
+
+        ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
+
+        // Unmount SD card from /media
+        printf("Unmounting SD card\n");
+        if (umount("/media")  != 0) {
+            printf("Warning: failed to unmount SD card\n");
+        }
+    }
+    else {
+        printf("Failed to mount SD card\n");
     }
 
     printf("\nSetting Ethernet MAC and IP addresses\n\n");
