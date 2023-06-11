@@ -29,6 +29,7 @@
 #include "xil_printf.h"
 #include "xil_io.h"
 #include "fsbl_hooks.h"
+#include "qspi.h"
 
 /************************** Variable Definitions *****************************/
 
@@ -133,6 +134,28 @@ u32 FsblHookBeforeHandoff(void)
     }
     else {
         xil_printf("Did not find BCFG firmware: %x\r\n", hw_version);
+    }
+
+    // Query flash and get FPGA S/N
+    if (InitQspi() == XST_SUCCESS) {
+        char sn_buff[14];
+        if (QspiAccess(0xff0000, (u32)sn_buff, sizeof(sn_buff)) == XST_SUCCESS) {
+            if (strncmp(sn_buff, "FPGA ", 5) == 0) {
+                char *p = strchr(sn_buff, 0xff);
+                if (p)
+                    *p = 0;                  // Null terminate at first 0xff
+                else
+                    sn_buff[13] = 0;         // or at end of string
+
+                xil_printf("FPGA S/N: %s\r\n", sn_buff+5);
+            }
+        }
+        else {
+            xil_printf("Failed to read from QSPI\r\n");
+        }
+    }
+    else {
+        xil_printf("Failed to initialize QSPI\r\n");
     }
 
     return (Status);
