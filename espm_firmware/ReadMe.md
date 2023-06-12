@@ -5,3 +5,4 @@ This directory contains the compiled firmware (`espm.xsvf`) for the Altera FPGA 
 The source code for this firmware is not open source, but the LVDS protocol is open.
 
 This binary file is stored in this respository for convenience, so that it can be copied to the MicroSD image. This allows  the same SD to be used either for the FPGA V3.x inside the dVRK or dVRK-Si controller, or for the ESPM programmer attached to the dVRK-Si arm.
+The `espm-firmware-config.cmake` file specifies the ESPM firmware version and the location of the firmware file (`espm.xsvf`).

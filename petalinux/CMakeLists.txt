@@ -57,8 +57,9 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
   file (WRITE   ${VERSION_FILE} "mechatronics-embedded ${EMBEDDED_VERSION}\n")
   file (APPEND  ${VERSION_FILE} "mechatronics-firmware ${FIRMWARE_VERSION}\n")
-  file (APPEND  ${VERSION_FILE} "fpga                  ${FPGA_VERSION}\n")
   file (APPEND  ${VERSION_FILE} "xilinx-tools          ${Xilinx_VERSION}\n")
+  file (APPEND  ${VERSION_FILE} "fpga-hw               ${FPGA_VERSION}\n")
+  file (APPEND  ${VERSION_FILE} "espm-firmware         ${ESPM_FIRMWARE_VERSION}\n")
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/fpgav3/images/linux")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")
@@ -79,6 +80,9 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              ${ZYNQ_BOOT_FILE}
                              "${SD_IMAGE_DIR}/qspi-boot.bin"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             ${ESPM_FIRMWARE_FILE}
+                             ${SD_IMAGE_DIR}
                      COMMENT "Creating MicroSD Image"
                      DEPENDS "fpgav3_build")
 

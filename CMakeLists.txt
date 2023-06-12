@@ -12,6 +12,7 @@ set (EMBEDDED_VERSION_PATCH 0)
 set (EMBEDDED_VERSION "${EMBEDDED_VERSION_MAJOR}.${EMBEDDED_VERSION_MINOR}.${EMBEDDED_VERSION_PATCH}")
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/espm_firmware")
 
 option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON)
 
@@ -33,6 +34,9 @@ if (BUILD_FPGAV30)
 else ()
   set (FPGA_VERSION "3.1")
 endif ()
+
+# espm-firmware should always be found, since it is in this repository
+find_package (espm-firmware)
 
 find_package (mechatronics-firmware)
 
