@@ -20,7 +20,7 @@ The top-level CMake file (CMakeLists.txt) in this directory contains options `US
 `USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
 option is only supported on Linux because the Xilinx Petalinux tool is only available on Linux.
 
-The basic build process is as follows:
+## Build Process
 
 1. Use Vivado to create the Xilinx Support Archive (XSA) file, which describes the hardware design,
 from the block design. The source files are located in the `block_design` sub-directory.
@@ -35,9 +35,29 @@ There are two supported platforms (and domains):
 
    2. Linux (`platform_linux`): This platform/domain is for applications that run on the Petalinux system. Although it is possible to add Linux applications to the Petalinux build (see below), it is usually more convenient to develop them here.
 
-3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though  in most  cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above. The source files are in the `petalinux` sub-directory.
+3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above. The source files are in the `petalinux` sub-directory.
 
-Note that Steps 2 and 3 overlap and could be done in the opposite order.
+## Output Files
+
+The relevant output files are placed into the petalinux/SD_Image directory in the build tree and should be copied to the MicroSD card:
+
+  * `BOOT.bin` -- first stage boot loader
+  * `boot.scr` -- U-boot script file
+  * `image.ub` -- Linux kernel image
+  * `FPGA1394V3-QLA.bit` -- firmware for QLA board
+  * `FPGA1394V3-DQLA.bit` -- firmware for DQLA board
+  * `FPGA1394V3-DRAC.bit` -- firmware for dRAC board
+  * `qspi-boot.bin` -- standalone first stage boot loader to copy to QSPI flash
+  * `espm.xsvf` -- firmware for ESPM in dVRK-Si arm (PSM or ECM)
+  * `version.txt` -- text file containing version information
+
+Note that the `fpgav3init` application compiled with the Linux kernel will autorun at startup, detect the connected board and then load the appropriate firmware (`bit` file). It will also copy `qspi-boot.bin` to the first partition in the flash, if not already there.
+
+## Release Notes
+
+  * Rev 1.0.0 (June 2023)
+    * Initial Release
+    * Output files built with Xilinx 2023.1 tools on Ubuntu 20.04
 
 ## Xilinx Tool Version Dependencies
 
