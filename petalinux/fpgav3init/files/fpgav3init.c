@@ -29,6 +29,7 @@
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <mtd/mtd-user.h>
+#include <gpiod.h>
 
 // Some hard-coded values
 const unsigned int GPIO_BASE = 906;
@@ -399,6 +400,57 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     return (ioctl(sockfd, SIOCSIFADDR, &ifr) != -1);
 }
 
+bool gpiod_test()
+{
+    unsigned int gpio_offsets[32];
+    int gpio_values[32];
+    uint32_t reg_hw_gpio;
+    size_t i;
+    for (i = 0; i < 32; i++)
+        gpio_offsets[i] = INDEX_EMIO_START+63-i;
+
+    // First, use context-less call, which is easier, but less efficient for repeated use
+    if (!gpiod_ctxless_get_value_multiple("/dev/gpiochip0", gpio_offsets, gpio_values, 32, false, "fpgav3init")) {
+        for (i = 0; i < 32; i++)
+            reg_hw_gpio = (reg_hw_gpio<<1)|gpio_values[i];
+        printf("GPIOD ctxless result: %x\n", reg_hw_gpio);
+    }
+    else  {
+        printf("GPIOD ctxless failed\n");
+    }
+
+    // Now, set up the context
+    // First, open the chip and print some info
+    struct gpiod_chip *chip = gpiod_chip_open("/dev/gpiochip0");
+    if (chip == NULL) {
+        printf("Failed to open /dev/gpiochip0\n");
+        return false;
+    }
+    printf("GPIO name %s, label %s, num lines %d\n", gpiod_chip_name(chip),
+           gpiod_chip_label(chip), gpiod_chip_num_lines(chip));
+
+    // Now get a group of lines (bits)
+    struct gpiod_line_bulk lines;
+    if (gpiod_chip_get_lines(chip, gpio_offsets, 32, &lines) != 0) {
+        printf("Failed to get lines\n");
+        gpiod_chip_close(chip);
+        return false;
+    }
+    printf("Bulk has %d lines\n", gpiod_line_bulk_num_lines(&lines));
+
+    // Set all lines to input
+    gpiod_line_request_bulk_input(&lines, "fpgav3init");
+    // Get the values
+    gpiod_line_get_value_bulk(&lines, gpio_values);
+    for (i = 0; i < 32; i++)
+        reg_hw_gpio = (reg_hw_gpio<<1)|gpio_values[i];
+    printf("GPIOD result: %x\n", reg_hw_gpio);
+
+    gpiod_line_release_bulk(&lines);
+    gpiod_chip_close(chip);
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     printf("*** FPGAV3 Initialization ***\n\n");
@@ -420,6 +472,9 @@ int main(int argc, char **argv)
 
     // Close EMIO interface (no need to check return value)
     EMIO_Init(false);
+
+    // Test gpiod library
+    gpiod_test();
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;

@@ -1411,8 +1411,8 @@ CONFIG_run-postinsts=y
 #
 # libgpiod
 #
-# CONFIG_libgpiod is not set
-# CONFIG_libgpiod-dev is not set
+CONFIG_libgpiod=y
+CONFIG_libgpiod-dev=y
 # CONFIG_libgpiod-dbg is not set
 
 #

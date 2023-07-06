@@ -11,6 +11,11 @@ SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "fpgav3init.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
+DEPENDS += "libgpiod"
+LDLIBS += " -lgpiod "
+
+EXTRA_OEMAKE = '"LDLIBS=${LDLIBS}"'
+
 do_install:append() {
     if ${@bb.utils.contains('DISTRO_FEATURES', 'sysvinit', 'true', 'false', d)}; then
         install -d ${D}${sysconfdir}/init.d/

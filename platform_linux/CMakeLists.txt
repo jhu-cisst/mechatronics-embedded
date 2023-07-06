@@ -34,3 +34,6 @@ vitis_app_create(
     BUILD_CONFIG   ${FPGAV3INIT_CONFIG})
 
 get_property(FPGAV3INIT_OUTPUT TARGET ${FPGAV3INIT_TARGET} PROPERTY OUTPUT_NAME)
+
+# Exclude from build for now (gpiod not yet supported)
+set_target_properties(${FPGAV3INIT_TARGET} PROPERTIES EXCLUDE_FROM_ALL ON)
