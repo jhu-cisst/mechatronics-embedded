@@ -73,59 +73,6 @@ void GetFpgaSerialNumber(char *sn)
     close(fd);
 }
 
-bool EMIO_Init(bool do_export)
-{
-    int fd;
-    if (do_export)
-        fd = open("/sys/class/gpio/export", O_WRONLY);
-    else
-        fd = open("/sys/class/gpio/unexport", O_WRONLY);
-
-    if (fd < 0) {
-        printf("Cannot open GPIO export/unexport\n");
-        return false;
-    }
-
-    char str[5];
-    for (unsigned int idx = INDEX_EMIO_START; idx < INDEX_EMIO_END; idx++) {
-        sprintf(str, "%d", GPIO_BASE+idx);
-        int nWrite = write(fd, str, strlen(str)+1);
-        if (nWrite != strlen(str)+1)
-            printf("Warning: error writing to GPIO export, return code %d\n", nWrite);
-    }
-    close(fd);
-
-    return true;
-}
-
-bool EMIO_Read(uint32_t *upper, uint32_t *lower)
-{
-    char fname[128];
-    char str[2];
-    for (unsigned int idx = INDEX_EMIO_END-1; idx >= INDEX_EMIO_START; idx--) {
-        sprintf(fname, "/sys/class/gpio/gpio%d/value", GPIO_BASE+idx);
-        int fd = open(fname, O_RDWR);
-        if (fd < 0) {
-            printf("Cannot open GPIO to read %d\n", idx);
-            return false;
-        }
-        int nRead = read(fd, str, sizeof(str));
-        if (nRead != sizeof(str))
-            printf("Warning: error reading GPIO, return code %d\n", nRead);
-        close(fd);
-        unsigned int val = str[0]-'0';
-        if ((val != 0) && (val != 1)) {
-            printf("Invalid value %c (%d) from GPIO %d\n", str[0], (int)str[0], idx);
-            return false;
-        }
-        if (idx < (INDEX_EMIO_START+32))
-            *lower = (*lower<<1)|val;
-        else
-            *upper = (*upper<<1)|val;
-    }
-    return true;
-}
-
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
 bool CopyFile(const char *filename, const char *srcDir, const char *destDir)
@@ -400,55 +347,104 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     return (ioctl(sockfd, SIOCSIFADDR, &ifr) != -1);
 }
 
-bool gpiod_test()
+// GPIO (EMIO) access to FPGA registers
+
+struct EMIO_Info {
+    struct gpiod_chip *chip;
+    struct gpiod_line_bulk reg_data_lines;
+    struct gpiod_line_bulk reg_addr_lines;
+    struct gpiod_line *req_read_bus_line;
+    struct gpiod_line *reg_rdata_valid_line;
+};
+
+bool EMIO_Init(struct EMIO_Info *info)
 {
-    unsigned int gpio_offsets[32];
-    int gpio_values[32];
-    uint32_t reg_hw_gpio;
+    unsigned int reg_data_offsets[32];
+    unsigned int reg_addr_offsets[16];
+    unsigned int req_read_bus_offset;
+    unsigned int reg_rdata_valid_offset;
+    int reg_addr_values[16];
+
     size_t i;
     for (i = 0; i < 32; i++)
-        gpio_offsets[i] = INDEX_EMIO_START+63-i;
-
-    // First, use context-less call, which is easier, but less efficient for repeated use
-    if (!gpiod_ctxless_get_value_multiple("/dev/gpiochip0", gpio_offsets, gpio_values, 32, false, "fpgav3init")) {
-        for (i = 0; i < 32; i++)
-            reg_hw_gpio = (reg_hw_gpio<<1)|gpio_values[i];
-        printf("GPIOD ctxless result: %x\n", reg_hw_gpio);
+        reg_data_offsets[i] = INDEX_EMIO_START+31-i;
+    for (i = 0; i < 16; i++) {
+        reg_addr_offsets[i] = INDEX_EMIO_START+47-i;
+        reg_addr_values[i] = 0;
     }
-    else  {
-        printf("GPIOD ctxless failed\n");
-    }
+    req_read_bus_offset = INDEX_EMIO_START+48;
+    reg_rdata_valid_offset = INDEX_EMIO_START+49;
 
-    // Now, set up the context
-    // First, open the chip and print some info
-    struct gpiod_chip *chip = gpiod_chip_open("/dev/gpiochip0");
-    if (chip == NULL) {
+    // First, open the chip
+    info->chip = gpiod_chip_open("/dev/gpiochip0");
+    if (info->chip == NULL) {
         printf("Failed to open /dev/gpiochip0\n");
         return false;
     }
-    printf("GPIO name %s, label %s, num lines %d\n", gpiod_chip_name(chip),
-           gpiod_chip_label(chip), gpiod_chip_num_lines(chip));
 
-    // Now get a group of lines (bits)
-    struct gpiod_line_bulk lines;
-    if (gpiod_chip_get_lines(chip, gpio_offsets, 32, &lines) != 0) {
-        printf("Failed to get lines\n");
-        gpiod_chip_close(chip);
+    // Get a group of lines (bits) for reg_data
+    if (gpiod_chip_get_lines(info->chip, reg_data_offsets, 32, &info->reg_data_lines) != 0) {
+        printf("Failed to get reg_data_lines\n");
+        gpiod_chip_close(info->chip);
         return false;
     }
-    printf("Bulk has %d lines\n", gpiod_line_bulk_num_lines(&lines));
-
     // Set all lines to input
-    gpiod_line_request_bulk_input(&lines, "fpgav3init");
-    // Get the values
-    gpiod_line_get_value_bulk(&lines, gpio_values);
-    for (i = 0; i < 32; i++)
-        reg_hw_gpio = (reg_hw_gpio<<1)|gpio_values[i];
-    printf("GPIOD result: %x\n", reg_hw_gpio);
+    gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init");
 
-    gpiod_line_release_bulk(&lines);
-    gpiod_chip_close(chip);
+    // Get a group of lines (bits) for reg_addr
+    if (gpiod_chip_get_lines(info->chip, reg_addr_offsets, 16, &info->reg_addr_lines) != 0) {
+        printf("Failed to get reg_addr_lines\n");
+        gpiod_chip_close(info->chip);
+        return false;
+    }
+    // Set all lines to output, initialized to 0
+    gpiod_line_request_bulk_output(&info->reg_addr_lines, "fpgav3init", reg_addr_values);
+
+    info->req_read_bus_line = gpiod_chip_get_line(info->chip, req_read_bus_offset);
+    gpiod_line_request_output(info->req_read_bus_line, "fpgav3init", 0);
+
+    info->reg_rdata_valid_line = gpiod_chip_get_line(info->chip, reg_rdata_valid_offset);
+    gpiod_line_request_input(info->reg_rdata_valid_line, "fpgav3init");
+
     return true;
+}
+
+void EMIO_Release(struct EMIO_Info *info)
+{
+    gpiod_line_release_bulk(&info->reg_data_lines);
+    gpiod_line_release_bulk(&info->reg_addr_lines);
+    gpiod_chip_close(info->chip);
+}
+
+// EMIO_ReadQuadlet: read quadlet from specified address
+void EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
+{
+    int reg_rdata_values[32];
+    int reg_addr_values[16];
+    size_t i;
+
+    for (i = 0; i < 16; i++)
+        reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
+
+    // Write reg_addr (read address)
+    gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+    // Set req_read_bus to 1 (rising edge requests firmware to read register)
+    gpiod_line_set_value(info->req_read_bus_line, 1);
+    // reg_rdata_valid should be set quickly by firmware, to indicate
+    // that read has completed
+    if (gpiod_line_get_value(info->reg_rdata_valid_line) != 1) {
+        printf("Waiting to read");
+        // Should set a timeout for following while loop
+        while (gpiod_line_get_value(info->reg_rdata_valid_line) != 1)
+            printf(".");
+        printf("\n");
+    }
+    // Read data from reg_data
+    gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
+    // Set req_read_bus to 0
+    gpiod_line_set_value(info->req_read_bus_line, 0);
+    for (i = 0; i < 32; i++)
+        *data = (*data<<1)|reg_rdata_values[i];
 }
 
 int main(int argc, char **argv)
@@ -461,20 +457,15 @@ int main(int argc, char **argv)
     if (fpga_sn[0])
         printf("FPGA S/N: %s\n", fpga_sn);
 
-    // Initialize EMIO interface
-    if (!EMIO_Init(true))
-        return -1;
-
-    // Read EMIO bits
     uint32_t reg_hw, reg_status;
-    if (!EMIO_Read(&reg_hw, &reg_status))
+    struct EMIO_Info emio;
+    if (!EMIO_Init(&emio))
         return -1;
 
-    // Close EMIO interface (no need to check return value)
-    EMIO_Init(false);
+    EMIO_ReadQuadlet(&emio, 4, &reg_hw);
+    EMIO_ReadQuadlet(&emio, 0, &reg_status);
 
-    // Test gpiod library
-    gpiod_test();
+    EMIO_Release(&emio);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
