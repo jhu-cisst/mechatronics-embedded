@@ -445,6 +445,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
         reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
 
     // Set all data lines to input
+    gpiod_line_release_bulk(&info->reg_data_lines);
     if (gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init") != 0) {
         printf("EMIO_ReadQuadlet: could not set data lines as input\n");
         return false;
@@ -486,6 +487,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
         reg_wdata_values[i] = (data&(0x80000000>>i)) ? 1 : 0;
 
     // Set all data lines to output and write values
+    gpiod_line_release_bulk(&info->reg_data_lines);
     if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
         printf("EMIO_WriteQuadlet: could not set data lines as output\n");
         return false;
