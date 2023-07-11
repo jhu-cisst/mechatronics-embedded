@@ -275,9 +275,14 @@ u32 FsblHookBeforeHandoff(void)
 
     // Query flash and get FPGA S/N
     if (InitQspi() == XST_SUCCESS) {
-        char sn_buff[14];
+        char sn_buff[16];
         if (QspiAccess(0xff0000, (u32)sn_buff, sizeof(sn_buff)) == XST_SUCCESS) {
             if (strncmp(sn_buff, "FPGA ", 5) == 0) {
+                // Write to FPGA PROM registers
+                for (int i = 0; i < 4; i++) {
+                    uint32_t prom_data = Xil_EndianSwap32(*(u32 *)(sn_buff+i*4));
+                    EMIO_WriteQuadlet(0x2000+i, prom_data);
+                }
                 char *p = strchr(sn_buff, 0xff);
                 if (p)
                     *p = 0;                  // Null terminate at first 0xff

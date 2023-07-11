@@ -11,6 +11,7 @@
  *   4) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
  *   5) Copies qspi-boot.bin to flash if different
  *   6) Sets the Ethernet MAC and IP addresses
+ *   7) Copies FPGA serial number from QSPI to FPGA (via EMIO)
  */
 
 #include <stdio.h>
@@ -30,6 +31,7 @@
 #include <arpa/inet.h>
 #include <mtd/mtd-user.h>
 #include <gpiod.h>
+#include <byteswap.h>
 
 // Some hard-coded values
 const unsigned int GPIO_BASE = 906;
@@ -515,6 +517,43 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     return true;
 }
 
+// CopyQspiToFpga: Copy bytes from QSPI flash to FPGA registers. This is used to
+//    copy the FPGA S/N (first 16 bytes).
+// Parameters:
+//    qspiDev   QSPI device name (e.g., "/dev/mtd4ro")
+//    emio      EMIO_Info structure used to write to FPGA registers via EMIO
+//    fpgaAddr  FPGA register base address (0x2000 for PROM data)
+//    nbytes    Number of bytes to copy (this is rounded up to nearest power of 4)
+
+bool CopyQspiToFpga(char *qspiDev, struct EMIO_Info *emio, uint16_t fpgaAddr, uint16_t nbytes)
+{
+    int fd = open(qspiDev, O_RDONLY);
+    if (fd < 0) {
+        printf("CopyQspiToFpga: cannot open QSPI flash device %s\n", qspiDev);
+        return false;
+    }
+
+    // Round up to nearest multiple of 4
+    uint16_t nQuads = (nbytes+3)/4;
+    nbytes = 4*nQuads;
+    char *data = (char *) malloc(nbytes);
+    int n = read(fd, data, nbytes);
+    close(fd);
+    if (n != nbytes) {
+        printf("CopyQspiToFpga: attempted to read %d bytes, but read returned %d\n",
+               nbytes, n);
+        free(data);
+        return false;
+    }
+    for (uint16_t i = 0; i < nQuads; i++) {
+        uint32_t qdata = bswap_32(*(uint32_t *)(data+i*4));
+        if (!EMIO_WriteQuadlet(emio, fpgaAddr+i, qdata))
+            return false;
+    }
+    free(data);
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     printf("*** FPGAV3 Initialization ***\n\n");
@@ -532,8 +571,6 @@ int main(int argc, char **argv)
 
     EMIO_ReadQuadlet(&emio, 4, &reg_hw);
     EMIO_ReadQuadlet(&emio, 0, &reg_status);
-
-    EMIO_Release(&emio);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
@@ -603,6 +640,12 @@ int main(int argc, char **argv)
         printf("Failed to set MAC or IP address for eth0\n");
     if (!SetMACandIP("eth1", 1, board_id))
         printf("Failed to set MAC or IP address for eth1\n");
+
+    // Copy first 16 bytes (i.e., FPGA S/N)
+    // from QSPI flash to FPGA registers
+    CopyQspiToFpga("/dev/mtd4ro", &emio, 0x2000, 16);
+
+    EMIO_Release(&emio);
 
     printf("*** FPGAV3 Initialization Complete ***\n\n");
     return 0;
