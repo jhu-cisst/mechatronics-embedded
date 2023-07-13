@@ -310,7 +310,11 @@ function (vitis_create OBJECT_TYPE ...)
       file (APPEND ${TCL_CREATE} "  puts stderr \"${XSCT_CMD} config: $errMsgFlag\"\n}\n")
     endforeach (flag)
     # Set header and linker information for TARGET_LIBRARIES (if any)
+    set (TARGET_OUTPUTS "")
     foreach (lib ${TARGET_LIBS})
+      # Get the output filename (this is used for dependency checking in add_custom_command)
+      get_property(LIB_OUTPUT_NAME TARGET ${lib} PROPERTY OUTPUT_NAME)
+      set (TARGET_OUTPUTS ${TARGET_OUTPUTS} ${LIB_OUTPUT_NAME})
       # Add library include directory
       get_property(LIB_HEADER_DIR TARGET ${lib} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
       file (APPEND ${TCL_CREATE} "${XSCT_CMD} config -name ${OBJECT_NAME} -add include-path ${LIB_HEADER_DIR}\n")
@@ -359,17 +363,19 @@ function (vitis_create OBJECT_TYPE ...)
     endif ()
 
     add_custom_command (OUTPUT ${OBJECT_OUTPUT}
+                        # Remove output file to force a rebuild
+                        COMMAND ${CMAKE_COMMAND} -E remove -f ${OBJECT_OUTPUT}
                         COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
                         COMMENT "Building ${XSCT_CMD} ${OBJECT_NAME}"
-                        DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_LIBS})
+                        DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
 
     add_custom_target(${TARGET_NAME} ALL
                       DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS})
 
-    if (XSCT_CMD STREQUAL "app")
-      set_property(TARGET ${TARGET_NAME}
-                 PROPERTY OUTPUT_NAME ${OBJECT_OUTPUT})
-    else ()  # "library"
+    set_property(TARGET ${TARGET_NAME}
+                        PROPERTY OUTPUT_NAME ${OBJECT_OUTPUT})
+
+    if (XSCT_CMD STREQUAL "library")
       set_property(TARGET ${TARGET_NAME}
                           PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/src")
       # Alternatively, could set LIBRARY_OUTPUT_NAME and LIBRARY_OUTPUT_DIRECTORY

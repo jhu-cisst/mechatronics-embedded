@@ -143,7 +143,7 @@ if (BIT_FILE)
       BIT_FILE       ${BIT_FILE}
       DEPENDENCIES   ${MFG_TEST_NAME})
 
-  set (ECHO_TEST_DEPS ${FSBL_OUTPUT} ${ECHO_TEST_NAME})
+  set (ECHO_TEST_DEPS ${ECHO_TEST_NAME})
   vitis_boot_create(
       BIF_NAME       "echo_test_boot"
       FSBL_FILE      ${FSBL_OUTPUT}
@@ -151,7 +151,7 @@ if (BIT_FILE)
       APP_FILE       ${ECHO_TEST_OUTPUT}
       DEPENDENCIES   ${ECHO_TEST_DEPS})
 
-  set (DEMO_APP_DEPS ${FSBL_OUTPUT} ${DEMO_APP_NAME})
+  set (DEMO_APP_DEPS ${DEMO_APP_NAME})
   vitis_boot_create(
       BIF_NAME       "demo_app_boot"
       FSBL_FILE      ${FSBL_OUTPUT}
