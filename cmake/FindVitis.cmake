@@ -7,6 +7,8 @@ get_filename_component(VITIS_BIN ${VITIS_XSCT} PATH)
 
 find_program(VITIS_BOOTGEN NAMES "bootgen" HINTS ${VITIS_BIN} DOC "Xilinx Vitis bootgen tool")
 
+get_filename_component(VITIS_ROOT ${VITIS_BIN} DIRECTORY)
+
 # Check Vitis version. Even though the version is usually part of the path, it is better
 # to parse the output from an executable. Although "vitis -version" would work, since we are
 # finding xsct, we instead use: xsct -eval "puts [version]"

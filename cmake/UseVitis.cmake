@@ -30,21 +30,26 @@
 #
 ##########################################################################################
 #
-# Function: vitis_app_create
+# Function: vitis_create
 #
 # Parameters:
-#   - TARGET_NAME     CMake target name (optional, defaults to APP_NAME)
-#   - APP_NAME        Name of application
+#   - OBJECT_TYPE     APP or LIBRARY (required as first parameter)
+#   - TARGET_NAME     CMake target name (optional, defaults to APP_NAME or LIB_NAME)
+#   - APP_NAME        Name of app (APP only)
+#   - LIB_NAME        Name of library (LIBRARY only)
 #   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
-#   - TEMPLATE_NAME   Name of Vitis application template
+#   - TEMPLATE_NAME   Name of Vitis application template (APP only)
+#   - LIB_TYPE        Library type (static or shared) (LIBRARY only)
 #   - ADD_SOURCE      Additional source files (optional)
-#   - DEL_SOURCE      Source files to delete (optional)
+#   - DEL_SOURCE      Source files to delete (optional, APP only)
+#   - TARGET_LIBS     Library targets (optional, APP only)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
 #   - COMPILER_FLAGS  Compiler flags (optional), prepend with '/' to remove
 #
 # Description:
-#   This function creates an application from the specified template and then
-#   builds it. Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
+#   This function creates an app or library and then builds it. For an APP,
+#   TEMPLATE_NAME must be specified. For a LIBRARY, LIB_TYPE must be specified.
+#   Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
 #   causes that compiler option to be removed.
 #
 ##########################################################################################
@@ -69,6 +74,7 @@
 # Parameters:
 #   - PLATFORM_NAMES  Names of platforms to remove
 #   - APP_NAMES       Names of apps to remove
+#   - LIBRARY_NAMES   Names of libraries to remove
 #
 # Description:
 #   This target uses the Xilinx XSCT tool to clean files in the build tree.
@@ -161,16 +167,19 @@ function (vitis_platform_create ...)
 
 endfunction (vitis_platform_create)
 
-function (vitis_app_create ...)
+function (vitis_create OBJECT_TYPE ...)
 
   # set all keywords and their values to ""
   set (FUNCTION_KEYWORDS
        TARGET_NAME
        APP_NAME
+       LIB_NAME
        PLATFORM_NAME
        TEMPLATE_NAME
+       LIB_TYPE
        ADD_SOURCE
        DEL_SOURCE
+       TARGET_LIBS
        BUILD_CONFIG
        COMPILER_FLAGS)
 
@@ -190,55 +199,104 @@ function (vitis_app_create ...)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (APP_NAME AND PLATFORM_NAME AND TEMPLATE_NAME)
+  if (OBJECT_TYPE STREQUAL APP)
 
-    # If TARGET_NAME not specified, default is APP_NAME
+    set (OBJECT_NAME ${APP_NAME})
+    set (REQUIRED_KEYWORD TEMPLATE_NAME)
+
+    if (LIB_TYPE)
+      message (WARNING "vitis_create APP does not expect LIB_TYPE")
+    endif ()
+
+    set (XSCT_CMD "app")
+
+  elseif (OBJECT_TYPE STREQUAL LIBRARY)
+
+    set (OBJECT_NAME ${LIB_NAME})
+    set (REQUIRED_KEYWORD LIB_TYPE)
+
+    if (TEMPLATE_NAME)
+      message (WARNING "vitis_create LIBRARY does not expect TEMPLATE_NAME")
+    endif ()
+
+    if (DEL_SOURCE)
+      message (WARNING "vitis_create LIBRARY does not expect DEL_SOURCE")
+    endif ()
+
+    if (TARGET_LIBS)
+      message (WARNING "vitis_create LIBRARY does not expect TARGET_LIBS")
+    endif ()
+
+    set (XSCT_CMD "library")
+
+  else ()
+
+    message (SEND_ERROR "vitis_create: must specify APP or LIBRARY")
+
+  endif ()
+
+  if (OBJECT_NAME AND PLATFORM_NAME AND ${REQUIRED_KEYWORD})
+
+    # If TARGET_NAME not specified, default is OBJECT_NAME
     if (NOT TARGET_NAME)
-      set (TARGET_NAME ${APP_NAME})
+      set (TARGET_NAME ${OBJECT_NAME})
     endif (NOT TARGET_NAME)
 
     # If BUILD_CONFIG not specified, default is Release
     if (NOT BUILD_CONFIG)
-      set (BUILD_CONFIG "Release")
+      set (BUILD_CONFIG "release")
     endif (NOT BUILD_CONFIG)
 
     file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
 
-    #************** First, create the app ****************
+    #************** First, create the app or library ****************
 
     # The PRJ file is one of the generated outputs.
     #
-    # We make a copy of it, APP_PRJ_COPY, and use that as the custom
+    # We make a copy of it, OJBECT_PRJ_COPY, and use that as the custom
     # command output because "make clean" will remove the specified
     # output file. Vitis does not allow to create an app that already
     # exists, but if the PRJ file is missing, Vitis is not able to
-    # remove the app.
+    # remove the app or library.
     #
-    # The other advantage to using APP_PRJ_COPY is that the file time
-    # of APP_PRJ is updated when building the app, so we cannot have
-    # the build custom command depend on APP_PRJ. Previously, the
-    # work-around was to introduce an intermediate custom target,
-    # ${TARGET_NAME}_create, that depended on ${APP_PRJ} and then have
+    # The other advantage to using OBJECT_PRJ_COPY is that the file time
+    # of OBJECT_PRJ is updated when building the app or library, so we
+    # cannot have the build custom command depend on OBJECT_PRJ. Previously,
+    # the work-around was to introduce an intermediate custom target,
+    # ${TARGET_NAME}_create, that depended on ${OBJECT_PRJ} and then have
     # the build custom command depend on ${TARGET_NAME}_create. Now, we
-    # can instead have the build custom command depend on APP_PRJ_COPY.
+    # can instead have the build custom command depend on OBJECT_PRJ_COPY.
 
-    set (APP_PRJ      "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${APP_NAME}.prj")
-    set (APP_PRJ_COPY "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/cmake.copy")
+    set (OBJECT_PRJ      "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/${OBJECT_NAME}.prj")
+    set (OBJECT_PRJ_COPY "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/cmake.copy")
 
     # Create TCL file
-    set (TCL_CREATE "${CMAKE_CURRENT_BINARY_DIR}/make-${APP_NAME}-create.tcl")
+    set (TCL_CREATE "${CMAKE_CURRENT_BINARY_DIR}/make-${OBJECT_NAME}-create.tcl")
     file (WRITE  ${TCL_CREATE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
     # Set active platform
     file (APPEND ${TCL_CREATE} "platform active ${PLATFORM_NAME}\n")
-    # First, remove the application if it exists (i.e., if APP_PRJ exists).
-    # We could instead copy APP_PRJ to APP_PRJ_COPY, but that behavior would
+    # First, remove the app or library if it exists (i.e., if OBJECT_PRJ exists).
+    # We could instead copy OBJECT_PRJ to OBJECT_PRJ_COPY, but that behavior would
     # not be consistent with "make clean".
-    file (APPEND ${TCL_CREATE} "if { [file exists ${APP_PRJ}] } {\n")
-    file (APPEND ${TCL_CREATE} "  if { [catch {app remove ${APP_NAME}} errMsg ]} {\n")
-    file (APPEND ${TCL_CREATE} "    puts stderr \"app remove: $errMsg\"\n  }\n}\n")
-    # Create app, using active platform (and domain); also creates sysproj ${APP_NAME}_system
-    file (APPEND ${TCL_CREATE} "if { [catch {app create -name ${APP_NAME} -template {${TEMPLATE_NAME}}} errMsg ]} {\n")
-    file (APPEND ${TCL_CREATE} "  puts stderr \"app create: $errMsg\"\n")
+    file (APPEND ${TCL_CREATE} "if { [file exists ${OBJECT_PRJ}] } {\n")
+    file (APPEND ${TCL_CREATE} "  if { [catch {${XSCT_CMD} remove ${OBJECT_NAME}} errMsg ]} {\n")
+    file (APPEND ${TCL_CREATE} "    puts stderr \"${XSCT_CMD} remove: $errMsg\"\n  }\n}\n")
+    # Create app or library, using active platform (and domain); also creates sysproj ${OBJECT_NAME}_system
+    if (XSCT_CMD STREQUAL "app")
+      file (APPEND ${TCL_CREATE} "app create -name ${OBJECT_NAME} -template {${TEMPLATE_NAME}}\n")
+    else ()
+      file (APPEND ${TCL_CREATE} "library create -name ${OBJECT_NAME} -type ${LIB_TYPE}\n")
+    endif ()
+    # Set build configuration (i.e., Release or Debug)
+    file (APPEND ${TCL_CREATE} "if { [catch {${XSCT_CMD} config -name ${OBJECT_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
+    file (APPEND ${TCL_CREATE} "  puts stderr \"${XSCT_CMD} build-config: $errMsgCfg\"\n}\n")
+    if (XSCT_CMD STREQUAL "library")
+      # For some reason, library does not already have path to BSP include dir
+      set (BSP_INCLUDE_DIR "export/FpgaV31Standalone/sw/FpgaV31Standalone/standalone_domain/bspinclude/include")
+      set (BSP_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/${BSP_INCLUDE_DIR}")
+      file (APPEND ${TCL_CREATE} "if { [catch {library config -name ${OBJECT_NAME} -add include-path ${BSP_INCLUDE_DIR}} errMsgFlag ]} {\n")
+      file (APPEND ${TCL_CREATE} "  puts stderr \"library config include-path: $errMsgFlag\"\n}\n")
+    endif ()
     # Set compiler flags
     foreach (flag ${COMPILER_FLAGS})
       string (SUBSTRING ${flag} 0 1 flag0)
@@ -248,19 +306,30 @@ function (vitis_app_create ...)
       else ()
         set (REMOVE_FLAG "")
       endif ()
-      file (APPEND ${TCL_CREATE} "if { [catch {app config -name ${APP_NAME} ${REMOVE_FLAG} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
-      file (APPEND ${TCL_CREATE} "  puts stderr \"app config: $errMsgFlag\"\n}\n")
+      file (APPEND ${TCL_CREATE} "if { [catch {${XSCT_CMD} config -name ${OBJECT_NAME} ${REMOVE_FLAG} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
+      file (APPEND ${TCL_CREATE} "  puts stderr \"${XSCT_CMD} config: $errMsgFlag\"\n}\n")
     endforeach (flag)
-    # If app creation was successful, copy APP_PRJ to APP_PRJ_COPY
-    file (APPEND ${TCL_CREATE} "} else {\n")
-    file (APPEND ${TCL_CREATE} "  file copy -force -- ${APP_PRJ} ${APP_PRJ_COPY}\n}\n")
+    # Set header and linker information for TARGET_LIBRARIES (if any)
+    foreach (lib ${TARGET_LIBS})
+      # Add library include directory
+      get_property(LIB_HEADER_DIR TARGET ${lib} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+      file (APPEND ${TCL_CREATE} "${XSCT_CMD} config -name ${OBJECT_NAME} -add include-path ${LIB_HEADER_DIR}\n")
+      # Add library archive directory
+      get_property(LIB_ARCHIVE_DIR TARGET ${lib} PROPERTY ARCHIVE_OUTPUT_DIRECTORY)
+      file (APPEND ${TCL_CREATE} "${XSCT_CMD} config -name ${OBJECT_NAME} -add library-search-path ${LIB_ARCHIVE_DIR}\n")
+      # Add library name
+      get_property(LIB_ARCHIVE_NAME TARGET ${lib} PROPERTY ARCHIVE_OUTPUT_NAME)
+      file (APPEND ${TCL_CREATE} "${XSCT_CMD} config -name ${OBJECT_NAME} -add libraries ${LIB_ARCHIVE_NAME}\n")
+    endforeach (lib)
+    # If app or library creation was successful, copy OBJECT_PRJ to OBJECT_PRJ_COPY
+    file (APPEND ${TCL_CREATE} "file copy -force -- ${OBJECT_PRJ} ${OBJECT_PRJ_COPY}\n")
 
-    add_custom_command (OUTPUT ${APP_PRJ_COPY}
+    add_custom_command (OUTPUT ${OBJECT_PRJ_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
-                        COMMENT "Creating app ${APP_NAME}"
+                        COMMENT "Creating ${XSCT_CMD} ${OBJECT_NAME}"
                         DEPENDS ${PLATFORM_NAME})
 
-    #************** Next, build the app ****************
+    #************** Next, build the app or library ****************
 
     # Create TCL file
     set (TCL_BUILD "${CMAKE_CURRENT_BINARY_DIR}/make-${TARGET_NAME}-build.tcl")
@@ -269,40 +338,54 @@ function (vitis_app_create ...)
     file (APPEND ${TCL_BUILD} "platform active ${PLATFORM_NAME}\n")
     # Delete any specified source file
     foreach (src ${DEL_SOURCE})
-      file (APPEND ${TCL_BUILD} "file delete ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/src/${src}\n")
+      file (APPEND ${TCL_BUILD} "file delete ${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/src/${src}\n")
     endforeach (src)
     # Add source files, if any
     foreach (src ${ADD_SOURCE})
-      file (APPEND ${TCL_BUILD} "importsources -name ${APP_NAME} -path ${src}\n")
+      file (APPEND ${TCL_BUILD} "importsources -name ${OBJECT_NAME} -path ${src}\n")
     endforeach (src)
-    # Set build configuration (i.e., Release or Debug)
-    file (APPEND ${TCL_BUILD} "if { [catch {app config -name ${APP_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
-    file (APPEND ${TCL_BUILD} "  puts stderr \"app build-config: $errMsgCfg\"\n}\n")
-    # Compile app
-    file (APPEND ${TCL_BUILD} "if { [catch {app build -name ${APP_NAME}} errMsgBuild]} {\n")
-    file (APPEND ${TCL_BUILD} "  puts stderr \"app build: $errMsgBuild\"\n}\n")
+    # Compile app or library
+    file (APPEND ${TCL_BUILD} "${XSCT_CMD} build -name ${OBJECT_NAME}\n")
 
-    # This is the output (executable)
-    set (APP_EXEC "${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}/${BUILD_CONFIG}/${APP_NAME}.elf")
+    # This is the output (executable or library)
+    if (XSCT_CMD STREQUAL "app")
+      set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/${BUILD_CONFIG}/${OBJECT_NAME}.elf")
+    else ()  # "library"
+      if (LIB_TYPE STREQUAL "static")
+        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.a")
+      else ()
+        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.so")
+      endif ()
+    endif ()
 
-    add_custom_command (OUTPUT ${APP_EXEC}
+    add_custom_command (OUTPUT ${OBJECT_OUTPUT}
                         COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
-                        COMMENT "Building app ${APP_NAME}"
-                        DEPENDS ${APP_PRJ_COPY} ${ADD_SOURCE})
+                        COMMENT "Building ${XSCT_CMD} ${OBJECT_NAME}"
+                        DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_LIBS})
 
     add_custom_target(${TARGET_NAME} ALL
-                      DEPENDS ${APP_EXEC})
+                      DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS})
 
-    set_property(TARGET ${TARGET_NAME}
-                 PROPERTY OUTPUT_NAME ${APP_EXEC})
+    if (XSCT_CMD STREQUAL "app")
+      set_property(TARGET ${TARGET_NAME}
+                 PROPERTY OUTPUT_NAME ${OBJECT_OUTPUT})
+    else ()  # "library"
+      set_property(TARGET ${TARGET_NAME}
+                          PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/src")
+      # Alternatively, could set LIBRARY_OUTPUT_NAME and LIBRARY_OUTPUT_DIRECTORY
+      set_property(TARGET ${TARGET_NAME}
+                          PROPERTY ARCHIVE_OUTPUT_NAME ${LIB_NAME})
+      set_property(TARGET ${TARGET_NAME}
+                          PROPERTY ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/${BUILD_CONFIG}")
+    endif ()
 
   else ()
 
-    message (SEND_ERROR "vitis_app_create: required parameter missing")
+    message (SEND_ERROR "vitis_create: required parameter missing")
 
   endif ()
 
-endfunction (vitis_app_create)
+endfunction (vitis_create)
 
 function (vitis_boot_create ...)
 
@@ -371,7 +454,8 @@ function (vitis_clean ...)
   # set all keywords and their values to ""
   set (FUNCTION_KEYWORDS
        PLATFORM_NAMES
-       APP_NAMES)
+       APP_NAMES
+       LIBRARY_NAMES)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -400,6 +484,12 @@ function (vitis_clean ...)
     file (APPEND ${TCL_FILE} "if { [catch {sysproj remove ${app}_system} errMsgSys ]} {\n")
     file (APPEND ${TCL_FILE} "  puts stderr \"sysproj remove: $errMsgSys\"\n}\n")
   endforeach (app)
+  foreach (lib ${LIBRARY_NAMES})
+    file (APPEND ${TCL_FILE} "if { [catch {library remove ${lib}} errMsgLib ]} {\n")
+    file (APPEND ${TCL_FILE} "  puts stderr \"library remove: $errMsgLib\"\n}\n")
+    file (APPEND ${TCL_FILE} "if { [catch {sysproj remove ${lib}_system} errMsgSys ]} {\n")
+    file (APPEND ${TCL_FILE} "  puts stderr \"sysproj remove: $errMsgSys\"\n}\n")
+  endforeach (lib)
   foreach (platform ${PLATFORM_NAMES})
     file (APPEND ${TCL_FILE} "if { [catch {platform remove ${platform}} errMsgPlat ]} {\n")
     file (APPEND ${TCL_FILE} "  puts stderr \"platform remove: $errMsgPlat\"\n}\n")

@@ -31,6 +31,24 @@ vitis_platform_create(
     LWIP_PATCH_SOURCE ${LWIP_PATCH_FILES}
     DEPENDENCIES      ${BLOCK_DESIGN_NAME})
 
+############################ FPGAV3 Lib #############################
+
+set (FPGAV3LIB_NAME   "fpgav3")
+set (FPGAV3LIB_TARGET "${FPGAV3LIB_NAME}lib")
+
+# Additional source files
+set (FPGAV3LIB_SOURCE
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.h"
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.c")
+
+vitis_create (LIBRARY
+    TARGET_NAME    ${FPGAV3LIB_TARGET}
+    LIB_NAME       ${FPGAV3LIB_NAME}
+    LIB_TYPE       "static"
+    PLATFORM_NAME  ${PLATFORM_STANDALONE}
+    ADD_SOURCE     ${FPGAV3LIB_SOURCE}
+    BUILD_CONFIG   "Release")
+
 ############################ FSBL App #############################
 
 set (FSBL_NAME   "zynq_fsbl")
@@ -40,14 +58,13 @@ set (FSBL_CONFIG "Release")
 set (FSBL_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c")
 
-# Specify /FSBL_DEBUG_INFO to remove that compiler option
-vitis_app_create(
+vitis_create (APP
     APP_NAME       ${FSBL_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "Zynq FSBL"
     ADD_SOURCE     ${FSBL_SOURCE}
-    BUILD_CONFIG   ${FSBL_CONFIG}
-    COMPILER_FLAGS "/FSBL_DEBUG_INFO")
+    TARGET_LIBS    ${FPGAV3LIB_TARGET}
+    BUILD_CONFIG   ${FSBL_CONFIG})
 
 get_property(FSBL_OUTPUT TARGET ${FSBL_NAME} PROPERTY OUTPUT_NAME)
 
@@ -64,11 +81,12 @@ set (MFG_TEST_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/memtest.c"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c")
 
-vitis_app_create(
+vitis_create (APP
     APP_NAME       ${MFG_TEST_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "Zynq FSBL"
     ADD_SOURCE     ${MFG_TEST_SOURCE}
+    TARGET_LIBS    ${FPGAV3LIB_TARGET}
     BUILD_CONFIG   ${MFG_TEST_CONFIG})
 
 get_property(MFG_TEST_OUTPUT TARGET ${MFG_TEST_NAME} PROPERTY OUTPUT_NAME)
@@ -81,7 +99,7 @@ set (ECHO_TEST_CONFIG "Release")
 # Additional source files
 set (ECHO_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/echo_test_src/main.c")
 
-vitis_app_create(
+vitis_create (APP
     APP_NAME       ${ECHO_TEST_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "lwIP Echo Server"
@@ -99,7 +117,7 @@ set (DEMO_APP_CONFIG "Release")
 set (DEMO_APP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/demo_app_src/main.c")
 set (DEMO_APP_DELETE "helloworld.c")
 
-vitis_app_create(
+vitis_create (APP
     APP_NAME       ${DEMO_APP_NAME}
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "Hello World"
@@ -148,7 +166,9 @@ else (BIT_FILE)
 endif (BIT_FILE)
 
 set (CLEAN_APP_NAMES ${FSBL_NAME} ${MFG_TEST_NAME} ${ECHO_TEST_NAME})
+set (CLEAN_LIBRARY_NAMES ${FSBL_NAME} ${MFG_TEST_NAME} ${ECHO_TEST_NAME})
 
 vitis_clean(
     PLATFORM_NAMES ${PLATFORM_STANDALONE}
-    APP_NAMES      ${CLEAN_APP_NAMES})
+    APP_NAMES      ${CLEAN_APP_NAMES}
+    LIBRARY_NAMES  ${FPGAV3LIB_NAME})

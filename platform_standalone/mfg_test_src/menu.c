@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "xil_printf.h"
-#include "xil_io.h"
 #include "sleep.h"
 #include "xqspips.h"
+#include "qspi.h"
+#include "fpgav3_emio.h"
 
 extern void outbyte(char c);
 extern char inbyte();
@@ -22,6 +23,33 @@ bool TestMemory();
 
 void menu()
 {
+    // Initialize EMIO bus interface
+    EMIO_Init();
+
+    // Query flash and get FPGA S/N
+    if (InitQspi() == XST_SUCCESS) {
+        char sn_buff[16];
+        if (QspiAccess(0xff0000, (u32)sn_buff, sizeof(sn_buff)) == XST_SUCCESS) {
+            if (strncmp(sn_buff, "FPGA ", 5) == 0) {
+                // Write to FPGA PROM registers
+                EMIO_WritePromData(sn_buff, sizeof(sn_buff));
+                char *p = strchr(sn_buff, 0xff);
+                if (p)
+                    *p = 0;                  // Null terminate at first 0xff
+                else
+                    sn_buff[13] = 0;         // or at end of string
+
+                xil_printf("FPGA S/N: %s\r\n", sn_buff+5);
+            }
+        }
+        else {
+            xil_printf("Failed to read from QSPI\r\n");
+        }
+    }
+    else {
+        xil_printf("Failed to initialize QSPI\r\n");
+    }
+
     char option = 1;
     printf("\r\n");
     while (option != '0') {
@@ -70,7 +98,8 @@ bool TestBoardID()
     int prev_id = 16;
     int debounce = 0;
     while (switchOK != 0x0000ffff) {
-        int status_reg = Xil_In32(XPS_GPIO_BASEADDR+0x00000068);
+        uint32_t status_reg;
+        EMIO_ReadQuadlet(0, &status_reg);
         int board_id = (status_reg&0x0f000000)>>24;
         if (board_id == prev_id) {
             debounce++;

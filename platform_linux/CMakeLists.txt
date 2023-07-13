@@ -25,7 +25,7 @@ set (FPGAV3INIT_TARGET "fpgav3initonly")
 # Additional source files
 set (FPGAV3INIT_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/fpgav3init/files/fpgav3init.c")
 
-vitis_app_create(
+vitis_create (APP
     TARGET_NAME    ${FPGAV3INIT_TARGET}
     APP_NAME       ${FPGAV3INIT_NAME}
     PLATFORM_NAME  ${PLATFORM_LINUX}
