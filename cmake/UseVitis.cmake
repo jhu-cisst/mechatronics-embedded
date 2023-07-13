@@ -348,6 +348,8 @@ function (vitis_create OBJECT_TYPE ...)
     foreach (src ${ADD_SOURCE})
       file (APPEND ${TCL_BUILD} "importsources -name ${OBJECT_NAME} -path ${src}\n")
     endforeach (src)
+    # Clean the app or library to force a rebuild
+    file (APPEND ${TCL_BUILD} "${XSCT_CMD} clean -name ${OBJECT_NAME}\n")
     # Compile app or library
     file (APPEND ${TCL_BUILD} "${XSCT_CMD} build -name ${OBJECT_NAME}\n")
 
@@ -363,8 +365,6 @@ function (vitis_create OBJECT_TYPE ...)
     endif ()
 
     add_custom_command (OUTPUT ${OBJECT_OUTPUT}
-                        # Remove output file to force a rebuild
-                        COMMAND ${CMAKE_COMMAND} -E remove -f ${OBJECT_OUTPUT}
                         COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
                         COMMENT "Building ${XSCT_CMD} ${OBJECT_NAME}"
                         DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
