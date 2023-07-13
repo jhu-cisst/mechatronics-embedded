@@ -335,6 +335,17 @@ function (vitis_create OBJECT_TYPE ...)
 
     #************** Next, build the app or library ****************
 
+    # This is the output (executable or library)
+    if (XSCT_CMD STREQUAL "app")
+      set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/${BUILD_CONFIG}/${OBJECT_NAME}.elf")
+    else ()  # "library"
+      if (LIB_TYPE STREQUAL "static")
+        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.a")
+      else ()
+        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.so")
+      endif ()
+    endif ()
+
     # Create TCL file
     set (TCL_BUILD "${CMAKE_CURRENT_BINARY_DIR}/make-${TARGET_NAME}-build.tcl")
     file (WRITE  ${TCL_BUILD} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
@@ -348,21 +359,13 @@ function (vitis_create OBJECT_TYPE ...)
     foreach (src ${ADD_SOURCE})
       file (APPEND ${TCL_BUILD} "importsources -name ${OBJECT_NAME} -path ${src}\n")
     endforeach (src)
-    # Clean the app or library to force a rebuild
-    file (APPEND ${TCL_BUILD} "${XSCT_CMD} clean -name ${OBJECT_NAME}\n")
+    # Remove the output file to force a rebuild. This is needed because although CMake correctly
+    # handles the dependency on TARGET_LIBS, it seems that XSCT does not re-link the app executable
+    # after the library has been updated. A more drastic solution would be to call "app clean".
+    # file (APPEND ${TCL_BUILD} "${XSCT_CMD} clean -name ${OBJECT_NAME}\n")
+    file (APPEND ${TCL_BUILD} "file delete ${OBJECT_OUTPUT}\n")
     # Compile app or library
     file (APPEND ${TCL_BUILD} "${XSCT_CMD} build -name ${OBJECT_NAME}\n")
-
-    # This is the output (executable or library)
-    if (XSCT_CMD STREQUAL "app")
-      set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${OBJECT_NAME}/${BUILD_CONFIG}/${OBJECT_NAME}.elf")
-    else ()  # "library"
-      if (LIB_TYPE STREQUAL "static")
-        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.a")
-      else ()
-        set (OBJECT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}/${BUILD_CONFIG}/lib${OBJECT_NAME}.so")
-      endif ()
-    endif ()
 
     add_custom_command (OUTPUT ${OBJECT_OUTPUT}
                         COMMAND ${XSCT_NATIVE} ${TCL_BUILD}
