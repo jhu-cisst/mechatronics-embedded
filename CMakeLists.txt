@@ -20,11 +20,29 @@ option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON)
 
 if (WIN32)
   set (USE_PETALINUX OFF)
+  set (BUILD_PETALINUX_SYSROOT OFF)
   set (CMAKE_CONFIGURATION_TYPES "Release")   # For Visual Studio
 else (WIN32)
   # Can only build Petalinux on Linux
   option (USE_PETALINUX "Build Petalinux image" OFF)
+  option (BUILD_PETALINUX_SYSROOT "Build Petalinux SDK (sysroot)" OFF)
+  if (BUILD_PETALINUX_SYSROOT)
+    # PETALINUX_SDK is the directory where the SDK will be installed
+    set (PETALINUX_SDK     "${CMAKE_BINARY_DIR}/petalinux/sdk")
+    # PETALINUX_SYSROOT is where the sysroot will be installed (within the SDK)
+    set (PETALINUX_SYSROOT "${PETALINUX_SDK}/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi")
+  endif ()
 endif (WIN32)
+
+if (USE_VITIS)
+  option (USE_PETALINUX_SYSROOT "Use Petalinux sysroot in Vitis" OFF)
+  if (USE_PETALINUX_SYSROOT AND NOT BUILD_PETALINUX_SYSROOT)
+      # If BUILD_PETALINUX_SYSROOT is ON, then PETALINUX_SYSROOT is already set.
+      # Otherwise, we set it to a user-specified sysroot.
+      set (PETALINUX_SYSROOT_EXTERNAL "" CACHE PATH "Path to external sysroot (from Petalinux)")
+      set (PETALINUX_SYSROOT PETALINUX_SYSROOT_EXTERNAL)
+  endif ()
+endif()
 
 option (BUILD_FPGAV30 "Build for FPGA V3.0 (instead of V3.1)" OFF)
 mark_as_advanced (BUILD_FPGAV30)
@@ -166,4 +184,7 @@ file (APPEND ${CONFIG_FILE} "set (FPGA_VERSION     ${FPGA_VERSION})\n\n")
 file (APPEND ${CONFIG_FILE} "set (USE_VIVADO       ${USE_VIVADO})\n")
 file (APPEND ${CONFIG_FILE} "set (USE_VITIS        ${USE_VITIS})\n")
 file (APPEND ${CONFIG_FILE} "set (USE_PETALINUX    ${USE_PETALINUX})\n\n")
+if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
+  file (APPEND ${CONFIG_FILE} "set (PETALINUX_SYSROOT      \"${PETALINUX_SYSROOT}\")\n\n")
+endif ()
 file (APPEND ${CONFIG_FILE} "set (Xilinx_VERSION   ${Xilinx_VERSION})\n")

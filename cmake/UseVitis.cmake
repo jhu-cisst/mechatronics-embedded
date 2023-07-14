@@ -15,8 +15,9 @@
 #   - HW_FILE            Input hardware file (XSA)
 #   - PROC_NAME          Processor name (see below)
 #   - OS_NAME            Operating system ("standalone" or "linux")
-#   - LIBRARIES          BSP libraries to install (optional)
-#   - LWIP_PATCH_SOURCE  Patch to lwip library (optional)
+#   - SYSROOT            Sysroot to use (linux)
+#   - LIBRARIES          BSP libraries to install (optional, standalone)
+#   - LWIP_PATCH_SOURCE  Patch to lwip library (optional, standalone)
 #   - DEPENDENCIES       Additional dependencies (optional)
 #
 # Description:
@@ -27,6 +28,7 @@
 #   ON, it can be set to the Vivado build target (BLOCK_DESIGN_NAME). This is not
 #   required, since the dependency on HW_FILE is enough to ensure that
 #   BLOCK_DESIGN_NAME (which creates HW_FILE) is built first.
+#   The SYSROOT parameter can be used to specify the SDK created by petalinux.
 #
 ##########################################################################################
 #
@@ -43,6 +45,7 @@
 #   - ADD_SOURCE      Additional source files (optional)
 #   - DEL_SOURCE      Source files to delete (optional, APP only)
 #   - TARGET_LIBS     Library targets (optional, APP only)
+#   - LIBRARIES       Additional libraries for linking (optional)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
 #   - COMPILER_FLAGS  Compiler flags (optional), prepend with '/' to remove
 #
@@ -91,6 +94,7 @@ function (vitis_platform_create ...)
        HW_FILE
        PROC_NAME
        OS_NAME
+       SYSROOT
        LIBRARIES
        LWIP_PATCH_SOURCE
        DEPENDENCIES)
@@ -131,6 +135,10 @@ function (vitis_platform_create ...)
     file (APPEND ${TCL_FILE} "  -os {${OS_NAME}} -no-boot-bsp -out {${CMAKE_CURRENT_BINARY_DIR}}\n")
     # Create the file platform.spr
     file (APPEND ${TCL_FILE} "platform write\n")
+    # Configure the domain using SYSROOT, if specified
+    if (SYSROOT)
+      file (APPEND ${TCL_FILE} "domain config -sysroot ${SYSROOT}\n")
+    endif ()
     # Add specified libraries to BSP
     foreach (lib ${LIBRARIES})
       file (APPEND ${TCL_FILE} "bsp setlib -name ${lib}\n")
@@ -180,6 +188,7 @@ function (vitis_create OBJECT_TYPE ...)
        ADD_SOURCE
        DEL_SOURCE
        TARGET_LIBS
+       LIBRARIES
        BUILD_CONFIG
        COMPILER_FLAGS)
 
@@ -309,6 +318,10 @@ function (vitis_create OBJECT_TYPE ...)
       file (APPEND ${TCL_CREATE} "if { [catch {${XSCT_CMD} config -name ${OBJECT_NAME} ${REMOVE_FLAG} define-compiler-symbols {${flag}}} errMsgFlag ]} {\n")
       file (APPEND ${TCL_CREATE} "  puts stderr \"${XSCT_CMD} config: $errMsgFlag\"\n}\n")
     endforeach (flag)
+    # Add any specified LIBRARIES
+    foreach (lib ${LIBRARIES})
+      file (APPEND ${TCL_CREATE} "${XSCT_CMD} config -name ${OBJECT_NAME} -add libraries ${lib}\n")
+    endforeach (lib)
     # Set header and linker information for TARGET_LIBRARIES (if any)
     set (TARGET_OUTPUTS "")
     foreach (lib ${TARGET_LIBS})

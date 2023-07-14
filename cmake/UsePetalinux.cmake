@@ -73,6 +73,21 @@
 #
 ##########################################################################################
 #
+# Function: petalinux_build_sdk
+#
+# Parameters:
+#   - PROJ_NAME          Project name
+#   - SDK_INSTALL_DIR    Directory for SDK installation
+#   - DEPENDENCIES       Build dependencies
+#
+# Description:
+#
+#   This function creates an SDK that can be used to build Petalinux applications in Vitis.
+#   Specifically, create a Linux platform in Vitis and then set the SYSROOT to the appropriate
+#   subdirectory in the SDK (i.e., sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi).
+#
+##########################################################################################
+#
 # Important CMake Information
 #
 # This implementation relies on CMake add_custom_command and add_custom_target, so it is
@@ -233,9 +248,9 @@ function (petalinux_create ...)
         COMMENT "Configuring Petalinux kernel"
         DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${BSP_CFG_SRC} ${DEVICE_TREE_FILES})
 
-    add_custom_target(${PROJ_NAME} ALL
-                      COMMENT "Checking Petalinux creation and hardware/kernel configuration"
-                      DEPENDS ${PETALINUX_CONFIG_OUTPUT})
+    add_custom_target (${PROJ_NAME} ALL
+                       COMMENT "Checking Petalinux creation and hardware/kernel configuration"
+                       DEPENDS ${PETALINUX_CONFIG_OUTPUT})
 
   else ()
 
@@ -336,9 +351,9 @@ function (petalinux_app_create ...)
 
     endif ()
 
-    add_custom_target(${APP_NAME} ALL
-                      COMMENT "Checking creation of ${APP_NAME} app"
-                      DEPENDS ${APP_CREATE_OUTPUT})
+    add_custom_target (${APP_NAME} ALL
+                       COMMENT "Checking creation of ${APP_NAME} app"
+                       DEPENDS ${APP_CREATE_OUTPUT})
 
   else ()
 
@@ -457,9 +472,9 @@ function (petalinux_build ...)
 
     endif ()
 
-    add_custom_target(${TARGET_NAME} ALL
-                      COMMENT "Checking Petalinux rootfs configuration and build"
-                      DEPENDS ${PETALINUX_BOOT_FILE})
+    add_custom_target (${TARGET_NAME} ALL
+                       COMMENT "Checking Petalinux rootfs configuration and build"
+                       DEPENDS ${PETALINUX_BOOT_FILE})
 
     # Finally, check if config files in build tree differ from source tree
     # (if there is a difference, consider updating source tree).
@@ -490,3 +505,59 @@ function (petalinux_build ...)
   endif ()
 
 endfunction (petalinux_build)
+
+function (petalinux_build_sdk)
+
+  # set all keywords and their values to ""
+  set (FUNCTION_KEYWORDS
+       PROJ_NAME
+       SDK_INSTALL_DIR
+       DEPENDENCIES)
+
+  # reset local variables
+  foreach(keyword ${FUNCTION_KEYWORDS})
+    set (${keyword} "")
+  endforeach(keyword)
+
+  # parse input (could instead use cmake_parse_arguments)
+  foreach (arg ${ARGV})
+    list (FIND FUNCTION_KEYWORDS ${arg} ARGUMENT_IS_A_KEYWORD)
+    if (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
+      set (CURRENT_PARAMETER ${arg})
+      set (${CURRENT_PARAMETER} "")
+    else (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
+      set (${CURRENT_PARAMETER} ${${CURRENT_PARAMETER}} ${arg})
+    endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
+  endforeach (arg)
+
+  if (PROJ_NAME AND SDK_INSTALL_DIR)
+
+    set (PETALINUX_SH_FILE  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux/sdk.sh")
+    set (PETALINUX_SDK_FILE "${SDK_INSTALL_DIR}/cmake.sdk")
+
+    add_custom_command (
+        OUTPUT ${PETALINUX_SH_FILE}
+        COMMAND petalinux-build --sdk
+        COMMENT "Building Petalinux SDK")
+
+    add_custom_command (
+        OUTPUT ${PETALINUX_SDK_FILE}
+        COMMAND petalinux-package --sysroot -d ${SDK_INSTALL_DIR}
+        COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_SDK_FILE}
+        # For some reason, petalinux-package does not accept the -p parameter,
+	# so we use WORKING_DIRECTORY to specify the project subdirectory
+        WORKING_DIRECTORY ${PROJ_NAME}
+        COMMENT "Packaging Petalinux SDK"
+        DEPENDS ${PETALINUX_SH_FILE})
+
+    add_custom_target ("${PROJ_NAME}-sdk" ALL
+                       COMMENT "Checking Petalinux SDK"
+                       DEPENDS ${PETALINUX_SDK_FILE} ${DEPENDENCIES})
+
+  else ()
+
+    message (SEND_ERROR "petalinux_build_sdk: required parameter missing")
+
+  endif ()
+
+endfunction (petalinux_build_sdk)

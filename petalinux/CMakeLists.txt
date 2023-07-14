@@ -41,12 +41,22 @@ petalinux_app_create (APP_NAME       "fpgav3sn"
 set (PETALINUX_BUILD_DEPS "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND}
                           "fpgav3sn"   ${FPGAV3SN_SOURCES})
 
-petalinux_build (TARGET_NAME         "fpgav3_build"
+set (PETALINUX_BUILD_TARGET "fpgav3_build")
+
+petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  PROJ_NAME           "fpgav3"
                  CONFIG_MENU         ${PETALINUX_MENU}
                  ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
+
+if (BUILD_PETALINUX_SYSROOT)
+
+  petalinux_build_sdk (PROJ_NAME       "fpgav3"
+                       SDK_INSTALL_DIR ${PETALINUX_SDK}
+                       DEPENDENCIES    ${PETALINUX_BUILD_TARGET})
+
+endif ()
 
 if (mechatronics-firmware_FOUND AND Vitis_FOUND)
 
