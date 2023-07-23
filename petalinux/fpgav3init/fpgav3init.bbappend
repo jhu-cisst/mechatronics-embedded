@@ -11,8 +11,8 @@ SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "fpgav3init.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
-DEPENDS += "libgpiod"
-LDLIBS += " -lgpiod "
+DEPENDS += "libfpgav3"
+LDLIBS += " -lfpgav3 "
 
 EXTRA_OEMAKE = '"LDLIBS=${LDLIBS}"'
 

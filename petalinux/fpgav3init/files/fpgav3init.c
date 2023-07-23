@@ -29,51 +29,13 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
-#include <mtd/mtd-user.h>
-#include <gpiod.h>
-#include <byteswap.h>
-
-// Some hard-coded values
-const unsigned int GPIO_BASE = 906;
-const unsigned int INDEX_EMIO_START = 54;
-const unsigned int INDEX_EMIO_END = 118;
+#include <fpgav3_emio.h>
+#include <fpgav3_qspi.h>
 
 // Detected board type
 enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
 char *BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
 char *FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
-
-// GetFpgaSerialNumber is duplicated in fpgav3init.c and fpgav3sn.c.
-// Eventually, this function (and others) can be moved to a shared library.
-
-// Format: FPGA 1234-56 (12 bytes) or FPGA 1234-567 (13 bytes).
-// Note that on PROM, the string is terminated by 0xff because the sector
-// is first erased (all bytes set to 0xff) before the string is written.
-// Maximum length of S/N is 9 bytes, including null termination.
-const size_t FPGA_SN_SIZE = 9;
-
-void GetFpgaSerialNumber(char *sn)
-{
-    sn[0] = 0;   // Initialize to empty string
-
-    int fd = open("/dev/mtd4ro", O_RDONLY);
-    if (fd < 0) {
-        printf("GetFpgaSerialNumber: cannot open QSPI flash device\n");
-        return;
-    }
-
-    char data[5];
-    int n = read(fd, data, 5);
-    if ((n == 5) && (strncmp(data, "FPGA ", 5) == 0)) {
-        read(fd, sn, FPGA_SN_SIZE-1);
-        char *p = strchr(sn, 0xff);
-        if (p)
-            *p = 0;                  // Null terminate at first 0xff
-        else
-            sn[FPGA_SN_SIZE-1] = 0;  // or at end of string
-    }
-    close(fd);
-}
 
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
@@ -210,88 +172,6 @@ bool ProgramFpga(const char *firmwareName)
     return FpgaLoad(binFile);
 }
 
-// Program QSPI flash
-//
-//   This function writes the specified file (fileName) to the specified QSPI
-//   flash partition (devName). To avoid unecessary erase/write cycles, it
-//   checks (sector-by-sector) whether the file contents are already present
-//   in the flash partition.
-
-bool ProgramFlash(const char *fileName, const char *devName)
-{
-    int fdFile = open(fileName, O_RDONLY);
-    if (fdFile < 0) {
-        printf("ProgramFlash: cannot open file %s\n", fileName);
-        return false;
-    }
-
-    int fdFlash = open(devName, O_RDWR);
-    if (fdFlash < 0) {
-        printf("ProgramFlash: cannot open QSPI flash device %s\n", devName);
-        close(fdFile);
-        return false;
-    }
-
-    // Get flash info
-    mtd_info_t mtd_info;
-    ioctl(fdFlash, MEMGETINFO, &mtd_info);
-
-    // Allocate buffers to hold contents of a sector (mtd_info.erasesize)
-    char *fileBuf = (char *) malloc(mtd_info.erasesize);
-    char *devBuf  = (char *) malloc(mtd_info.erasesize);
-    if (!fileBuf || !devBuf) {
-        printf("ProgramFlash: failed to allocate buffer of size %d\n", mtd_info.erasesize);
-        free(fileBuf);
-        free(devBuf);
-        close(fdFile);
-        close(fdFlash);
-        return false;
-    }
-
-    // Get file size
-    struct stat src_stat;
-    fstat(fdFile, &src_stat);
-
-    // Now, loop through number of sectors and check whether data in sector needs
-    // to be updated.
-    unsigned int numSame = 0;
-    unsigned int numDiff = 0;
-    erase_info_t ei;
-    ei.length = mtd_info.erasesize;
-    for (size_t nBytes = 0; nBytes < src_stat.st_size; nBytes += mtd_info.erasesize) {
-        size_t bytesLeft = src_stat.st_size - nBytes;
-        size_t nb = (bytesLeft < mtd_info.erasesize) ? bytesLeft : mtd_info.erasesize;
-        read(fdFile, fileBuf, nb);
-        read(fdFlash, devBuf, nb);
-        if (memcmp(fileBuf, devBuf, nb) == 0) {
-            numSame++;
-        }
-        else {
-            numDiff++;
-            // Back up in device file
-            lseek(fdFlash, -nb, SEEK_CUR);
-            // Erase sector
-            ei.start = nBytes;
-            ioctl(fdFlash, MEMUNLOCK, &ei);
-            ioctl(fdFlash, MEMERASE, &ei);
-            // write new contents
-            write(fdFlash, fileBuf, nb);
-        }
-    }
-    if (numDiff == 0) {
-        printf("ProgramFlash:  %s already present in %s\n", fileName, devName);
-    }
-    else {
-        printf("ProgramFlash:  updated %s in %s (%d of %d sectors)\n", fileName,
-               devName, numDiff, (numSame+numDiff));
-    }
-    free(fileBuf);
-    free(devBuf);
-    close(fdFile);
-    close(fdFlash);
-    return true;
-}
-
 // Export FPGA information as shell variables
 bool ExportFpgaInfo(char *fpga_ver, char *fpga_sn, char *board_type, unsigned int board_id)
 {
@@ -349,183 +229,14 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     return (ioctl(sockfd, SIOCSIFADDR, &ifr) != -1);
 }
 
-// GPIO (EMIO) access to FPGA registers
-
-struct EMIO_Info {
-    struct gpiod_chip *chip;
-    struct gpiod_line_bulk reg_data_lines;
-    struct gpiod_line_bulk reg_addr_lines;
-    struct gpiod_line *req_bus_line;
-    struct gpiod_line *op_done_line;
-    struct gpiod_line *reg_wen_line;
-    struct gpiod_line *blk_wstart_line;
-    struct gpiod_line *blk_wen_line;
-};
-
-bool EMIO_Init(struct EMIO_Info *info)
-{
-    unsigned int reg_data_offsets[32];
-    unsigned int reg_addr_offsets[16];
-    unsigned int req_bus_offset;
-    unsigned int op_done_offset;
-    unsigned int reg_wen_offset;
-    unsigned int blk_wstart_offset;
-    unsigned int blk_wen_offset;
-    int reg_addr_values[16];
-
-    size_t i;
-    for (i = 0; i < 32; i++)
-        reg_data_offsets[i] = INDEX_EMIO_START+31-i;
-    for (i = 0; i < 16; i++) {
-        reg_addr_offsets[i] = INDEX_EMIO_START+47-i;
-        reg_addr_values[i] = 0;
-    }
-    req_bus_offset = INDEX_EMIO_START+48;
-    op_done_offset = INDEX_EMIO_START+49;
-    reg_wen_offset = INDEX_EMIO_START+50;
-    blk_wstart_offset = INDEX_EMIO_START+51;
-    blk_wen_offset = INDEX_EMIO_START+52;
-
-    // First, open the chip
-    info->chip = gpiod_chip_open("/dev/gpiochip0");
-    if (info->chip == NULL) {
-        printf("Failed to open /dev/gpiochip0\n");
-        return false;
-    }
-
-    // Get a group of lines (bits) for reg_data
-    if (gpiod_chip_get_lines(info->chip, reg_data_offsets, 32, &info->reg_data_lines) != 0) {
-        printf("Failed to get reg_data_lines\n");
-        gpiod_chip_close(info->chip);
-        return false;
-    }
-    // Set all lines to input
-    gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init");
-
-    // Get a group of lines (bits) for reg_addr
-    if (gpiod_chip_get_lines(info->chip, reg_addr_offsets, 16, &info->reg_addr_lines) != 0) {
-        printf("Failed to get reg_addr_lines\n");
-        gpiod_chip_close(info->chip);
-        return false;
-    }
-    // Set all lines to output, initialized to 0
-    gpiod_line_request_bulk_output(&info->reg_addr_lines, "fpgav3init", reg_addr_values);
-
-    info->req_bus_line = gpiod_chip_get_line(info->chip, req_bus_offset);
-    gpiod_line_request_output(info->req_bus_line, "fpgav3init", 0);
-
-    info->op_done_line = gpiod_chip_get_line(info->chip, op_done_offset);
-    gpiod_line_request_input(info->op_done_line, "fpgav3init");
-
-    info->reg_wen_line = gpiod_chip_get_line(info->chip, reg_wen_offset);
-    gpiod_line_request_output(info->reg_wen_line, "fpgav3init", 0);
-
-    info->blk_wstart_line = gpiod_chip_get_line(info->chip, blk_wstart_offset);
-    gpiod_line_request_output(info->blk_wstart_line, "fpgav3init", 0);
-
-    info->blk_wen_line = gpiod_chip_get_line(info->chip, blk_wen_offset);
-    gpiod_line_request_output(info->blk_wen_line, "fpgav3init", 0);
-
-    return true;
-}
-
-void EMIO_Release(struct EMIO_Info *info)
-{
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    gpiod_line_release_bulk(&info->reg_addr_lines);
-    gpiod_chip_close(info->chip);
-}
-
-// EMIO_ReadQuadlet: read quadlet from specified address
-bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
-{
-    int reg_rdata_values[32];
-    int reg_addr_values[16];
-    size_t i;
-
-    for (i = 0; i < 16; i++)
-        reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
-
-    // Set all data lines to input
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    if (gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init") != 0) {
-        printf("EMIO_ReadQuadlet: could not set data lines as input\n");
-        return false;
-    }
-
-    // Write reg_addr (read address)
-    gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
-    // Set req_bus to 1 (rising edge requests firmware to read register)
-    gpiod_line_set_value(info->req_bus_line, 1);
-    // op_done should be set quickly by firmware, to indicate
-    // that read has completed
-    if (gpiod_line_get_value(info->op_done_line) != 1) {
-        printf("Waiting to read");
-        // Should set a timeout for following while loop
-        while (gpiod_line_get_value(info->op_done_line) != 1)
-            printf(".");
-        printf("\n");
-    }
-    // Read data from reg_data
-    gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
-    // Set req_bus to 0
-    gpiod_line_set_value(info->req_bus_line, 0);
-    for (i = 0; i < 32; i++)
-        *data = (*data<<1)|reg_rdata_values[i];
-    return true;
-}
-
-// EMIO_WriteQuadlet: write quadlet to specified address
-bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
-{
-    int reg_wdata_values[32];
-    int reg_addr_values[16];
-    size_t i;
-
-    for (i = 0; i < 16; i++)
-        reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
-
-    for (i = 0; i < 32; i++)
-        reg_wdata_values[i] = (data&(0x80000000>>i)) ? 1 : 0;
-
-    // Set all data lines to output and write values
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
-        printf("EMIO_WriteQuadlet: could not set data lines as output\n");
-        return false;
-    }
-
-    // Write reg_addr (write address)
-    gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
-
-    // Set reg_wen to 1
-    gpiod_line_set_value(info->reg_wen_line, 1);
-
-    // Set req_bus to 1 (rising edge requests firmware to write register)
-    gpiod_line_set_value(info->req_bus_line, 1);
-    // op_done should be set quickly by firmware, to indicate
-    // that write has completed
-    if (gpiod_line_get_value(info->op_done_line) != 1) {
-        printf("Waiting to write");
-        // Should set a timeout for following while loop
-        while (gpiod_line_get_value(info->op_done_line) != 1)
-            printf(".");
-        printf("\n");
-    }
-    // Set req_bus to 0
-    gpiod_line_set_value(info->req_bus_line, 0);
-    return true;
-}
-
-// CopyQspiToFpga: Copy bytes from QSPI flash to FPGA registers. This is used to
-//    copy the FPGA S/N (first 16 bytes).
+// CopyQspiToFpga: Copy bytes from QSPI flash to FPGA PROM registers. This is
+//   used to copy the FPGA S/N (first 16 bytes).
 // Parameters:
 //    qspiDev   QSPI device name (e.g., "/dev/mtd4ro")
 //    emio      EMIO_Info structure used to write to FPGA registers via EMIO
-//    fpgaAddr  FPGA register base address (0x2000 for PROM data)
-//    nbytes    Number of bytes to copy (this is rounded up to nearest power of 4)
+//    nbytes    Number of bytes to copy
 
-bool CopyQspiToFpga(char *qspiDev, struct EMIO_Info *emio, uint16_t fpgaAddr, uint16_t nbytes)
+bool CopyQspiToFpga(char *qspiDev, struct EMIO_Info *emio, uint16_t nbytes)
 {
     int fd = open(qspiDev, O_RDONLY);
     if (fd < 0) {
@@ -545,11 +256,7 @@ bool CopyQspiToFpga(char *qspiDev, struct EMIO_Info *emio, uint16_t fpgaAddr, ui
         free(data);
         return false;
     }
-    for (uint16_t i = 0; i < nQuads; i++) {
-        uint32_t qdata = bswap_32(*(uint32_t *)(data+i*4));
-        if (!EMIO_WriteQuadlet(emio, fpgaAddr+i, qdata))
-            return false;
-    }
+    EMIO_WritePromData(emio, data, nbytes);
     free(data);
     return true;
 }
@@ -565,12 +272,12 @@ int main(int argc, char **argv)
         printf("FPGA S/N: %s\n", fpga_sn);
 
     uint32_t reg_hw, reg_status;
-    struct EMIO_Info emio;
-    if (!EMIO_Init(&emio))
+    struct EMIO_Info *emio = EMIO_Init();
+    if (!emio)
         return -1;
 
-    EMIO_ReadQuadlet(&emio, 4, &reg_hw);
-    EMIO_ReadQuadlet(&emio, 0, &reg_status);
+    EMIO_ReadQuadlet(emio, 4, &reg_hw);
+    EMIO_ReadQuadlet(emio, 0, &reg_status);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
@@ -580,6 +287,7 @@ int main(int argc, char **argv)
     hwStr[4] = 0;
     if (strcmp(hwStr, "BCFG") != 0) {
         printf("fpgav3init: did not detect BCFG firmware, exiting\n");
+        EMIO_Release(emio);
         return -1;
     }
     printf("Hardware version: %s\n", hwStr);
@@ -643,9 +351,9 @@ int main(int argc, char **argv)
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers
-    CopyQspiToFpga("/dev/mtd4ro", &emio, 0x2000, 16);
+    CopyQspiToFpga("/dev/mtd4ro", emio, 16);
 
-    EMIO_Release(&emio);
+    EMIO_Release(emio);
 
     printf("*** FPGAV3 Initialization Complete ***\n\n");
     return 0;
