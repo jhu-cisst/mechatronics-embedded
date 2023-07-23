@@ -48,12 +48,16 @@
 #   - LIBRARIES       Additional libraries for linking (optional)
 #   - BUILD_CONFIG    Build configuration (optional, default is "Release")
 #   - COMPILER_FLAGS  Compiler flags (optional), prepend with '/' to remove
+#   - DEPENDENCIES    Additional dependencies
 #
 # Description:
 #   This function creates an app or library and then builds it. For an APP,
 #   TEMPLATE_NAME must be specified. For a LIBRARY, LIB_TYPE must be specified.
 #   Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
 #   causes that compiler option to be removed.
+#
+#   The optional DEPENDENCIES parameter can specify additional dependencies, beyond
+#   the assumed dependency on TARGET_LIBS.
 #
 ##########################################################################################
 #
@@ -190,7 +194,8 @@ function (vitis_create OBJECT_TYPE ...)
        TARGET_LIBS
        LIBRARIES
        BUILD_CONFIG
-       COMPILER_FLAGS)
+       COMPILER_FLAGS
+       DEPENDENCIES)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -386,7 +391,7 @@ function (vitis_create OBJECT_TYPE ...)
                         DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
 
     add_custom_target(${TARGET_NAME} ALL
-                      DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS})
+                      DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
                         PROPERTY OUTPUT_NAME ${OBJECT_OUTPUT})

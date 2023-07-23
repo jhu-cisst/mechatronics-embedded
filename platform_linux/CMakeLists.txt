@@ -9,8 +9,8 @@ endif (BUILD_FPGAV30)
 
 if (USE_PETALINUX_SYSROOT)
 
-  set (PETALINUX_SDK "${CMAKE_BINARY_DIR}/petalinux/fpgav3/images/linux/sdk")
-  set (PETALINUX_SYSROOT "${PETALINUX_SDK}/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi")
+  set (PETALINUX_SDK_FILE "${PETALINUX_SDK}/cmake.sdk")
+  set (PETALINUX_SYSROOT  "${PETALINUX_SDK}/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi")
 
   vitis_platform_create(
       PLATFORM_NAME     ${PLATFORM_LINUX}
@@ -18,7 +18,7 @@ if (USE_PETALINUX_SYSROOT)
       PROC_NAME         "ps7_cortexa9"
       OS_NAME           "linux"
       SYSROOT           ${PETALINUX_SYSROOT}
-      DEPENDENCIES      ${BLOCK_DESIGN_NAME})
+      DEPENDENCIES      ${BLOCK_DESIGN_NAME} ${PETALINUX_SDK_FILE})
 
 else ()
 
@@ -49,8 +49,9 @@ if (USE_PETALINUX_SYSROOT)
       PLATFORM_NAME  ${PLATFORM_LINUX}
       TEMPLATE_NAME  "Linux Empty Application"
       ADD_SOURCE     ${FPGAV3INIT_SOURCE}
-      LIBRARIES      "gpiod"
-      BUILD_CONFIG   "Release")
+      LIBRARIES      "fpgav3"
+      BUILD_CONFIG   "Release"
+      DEPENDENCIES   "fpgav3-sdk")
 
   get_property(FPGAV3INIT_OUTPUT TARGET ${FPGAV3INIT_TARGET} PROPERTY OUTPUT_NAME)
 

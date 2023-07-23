@@ -24,7 +24,7 @@ petalinux_create (PROJ_NAME          "fpgav3"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE})
 
-# ************************* fpgav3lib library *****************************
+# ************************** fpgav3 library *******************************
 
 set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.c"
@@ -62,7 +62,7 @@ petalinux_app_create (APP_NAME       "fpgav3sn"
                       APP_SOURCES    ${FPGAV3SN_SOURCES}
                       APP_BB         ${FPGAV3SN_BBAPPEND})
 
-set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BBAPPEND}
+set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
                           "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND}
                           "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND})
 
@@ -81,7 +81,8 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
 
 if (BUILD_PETALINUX_SYSROOT)
 
-  petalinux_build_sdk (PROJ_NAME       "fpgav3"
+  petalinux_build_sdk (TARGET_NAME     "fpgav3-sdk"
+                       PROJ_NAME       "fpgav3"
                        SDK_INSTALL_DIR ${PETALINUX_SDK}
                        DEPENDENCIES    ${PETALINUX_BUILD_TARGET})
 

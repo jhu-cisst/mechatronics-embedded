@@ -83,6 +83,7 @@
 # Function: petalinux_build_sdk
 #
 # Parameters:
+#   - TARGET_NAME        CMake target for building SDK
 #   - PROJ_NAME          Project name
 #   - SDK_INSTALL_DIR    Directory for SDK installation
 #   - DEPENDENCIES       Build dependencies
@@ -444,6 +445,8 @@ function (petalinux_build ...)
                 ARGS -E copy
                 ${CONFIG_BIN_FILE}
                 ${PETALINUX_ROOTFS_OUTPUT}
+        # Update time of PETALINUX_ROOTFS_OUTPUT
+        COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_ROOTFS_OUTPUT}
         COMMENT "Copying rootfs_config to build tree and configuring rootfs"
         DEPENDS ${PROJ_NAME} ${ROOTFS_CONFIG_SRC})
 
@@ -459,6 +462,10 @@ function (petalinux_build ...)
         # directory, but it works if we first clean the kernel build and then rebuild.
         COMMAND petalinux-build -p ${PROJ_NAME} -c kernel -x clean
         COMMAND petalinux-build -p ${PROJ_NAME}
+        # Update file times, just in case they were not regenerated
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${PETALINUX_IMAGE_UB}
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${PETALINUX_FSBL_FILE}
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${PETALINUX_UBOOT_FILE}
         COMMENT "Building petalinux"
         DEPENDS ${PETALINUX_ROOTFS_OUTPUT} ${DEPENDENCIES})
 
@@ -526,6 +533,7 @@ function (petalinux_build_sdk)
 
   # set all keywords and their values to ""
   set (FUNCTION_KEYWORDS
+       TARGET_NAME
        PROJ_NAME
        SDK_INSTALL_DIR
        DEPENDENCIES)
@@ -546,29 +554,38 @@ function (petalinux_build_sdk)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (PROJ_NAME AND SDK_INSTALL_DIR)
+  if (TARGET_NAME AND PROJ_NAME AND SDK_INSTALL_DIR)
 
-    set (PETALINUX_SH_FILE  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux/sdk.sh")
-    set (PETALINUX_SDK_FILE "${SDK_INSTALL_DIR}/cmake.sdk")
+    # Assume that SDK (sdk.sh) needs to be regenerated if image.ub has been updated
+    set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux")
+    set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
+    set (PETALINUX_SH_FILE    "${PETALINUX_IMAGE_DIR}/sdk.sh")
+    set (PETALINUX_SDK_FILE   "${SDK_INSTALL_DIR}/cmake.sdk")
 
     add_custom_command (
         OUTPUT ${PETALINUX_SH_FILE}
         COMMAND petalinux-build --sdk
-        COMMENT "Building Petalinux SDK")
+        # Set WORKING_DIRECTORY to Petalinux project subdirectory
+        WORKING_DIRECTORY ${PROJ_NAME}
+        COMMENT "Building Petalinux SDK"
+        DEPENDS ${PETALINUX_IMAGE_UB})
 
     add_custom_command (
         OUTPUT ${PETALINUX_SDK_FILE}
         COMMAND petalinux-package --sysroot -d ${SDK_INSTALL_DIR}
         COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_SDK_FILE}
         # For some reason, petalinux-package does not accept the -p parameter,
-	# so we use WORKING_DIRECTORY to specify the project subdirectory
+        # so we use WORKING_DIRECTORY to specify the project subdirectory
         WORKING_DIRECTORY ${PROJ_NAME}
         COMMENT "Packaging Petalinux SDK"
         DEPENDS ${PETALINUX_SH_FILE})
 
-    add_custom_target ("${PROJ_NAME}-sdk" ALL
+    add_custom_target (${TARGET_NAME} ALL
                        COMMENT "Checking Petalinux SDK"
                        DEPENDS ${PETALINUX_SDK_FILE} ${DEPENDENCIES})
+
+    set_property(TARGET ${TARGET_NAME}
+                        PROPERTY OUTPUT_NAME ${PETALINUX_SDK_FILE})
 
   else ()
 
