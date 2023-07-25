@@ -131,6 +131,9 @@ function (vitis_platform_create ...)
       set (LWIP_SRC_BUILD_DIR "${BSP_DIR}/${PROC_NAME}/libsrc/lwip213_v1_0/src/contrib/ports/xilinx/netif")
     endif ()
 
+    # VITIS_SYSROOT is directory where Vitis creates a copy of sysroot
+    set (VITIS_SYSROOT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/export/${PLATFORM_NAME}/sw/${PLATFORM_NAME}/linux_domain/sysroot")
+
     # Create TCL file
     set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${PLATFORM_NAME}.tcl")
     file (WRITE  ${TCL_FILE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
@@ -141,6 +144,8 @@ function (vitis_platform_create ...)
     file (APPEND ${TCL_FILE} "platform write\n")
     # Configure the domain using SYSROOT, if specified
     if (SYSROOT)
+      # Delete Vitis sysroot to force Vitis to recopy it, in case SDK changed
+      file (APPEND ${TCL_FILE} "file delete -force -- ${VITIS_SYSROOT}\n")
       file (APPEND ${TCL_FILE} "domain config -sysroot ${SYSROOT}\n")
     endif ()
     # Add specified libraries to BSP

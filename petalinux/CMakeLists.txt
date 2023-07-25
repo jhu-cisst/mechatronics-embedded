@@ -81,7 +81,7 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
 
 if (BUILD_PETALINUX_SYSROOT)
 
-  petalinux_build_sdk (TARGET_NAME     "fpgav3-sdk"
+  petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
                        PROJ_NAME       "fpgav3"
                        SDK_INSTALL_DIR ${PETALINUX_SDK}
                        DEPENDENCIES    ${PETALINUX_BUILD_TARGET})

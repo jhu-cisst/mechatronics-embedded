@@ -31,6 +31,8 @@ else (WIN32)
     set (PETALINUX_SDK     "${CMAKE_BINARY_DIR}/petalinux/sdk")
     # PETALINUX_SYSROOT is where the sysroot will be installed (within the SDK)
     set (PETALINUX_SYSROOT "${PETALINUX_SDK}/sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi")
+    # PETALINUX_SDK_TARGET is the CMake target
+    set (PETALINUX_SDK_TARGET "fpgav3-sdk")
   endif ()
 endif (WIN32)
 

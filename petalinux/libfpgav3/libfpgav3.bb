@@ -18,6 +18,8 @@ SRC_URI = "file://fpgav3_emio.h \
 
 S = "${WORKDIR}"
 
+inherit pkgconfig
+
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 PROVIDES = "fpgav3"
 TARGET_CC_ARCH += "${LDFLAGS}"
@@ -38,4 +40,4 @@ do_install() {
     oe_libinstall -so libfpgav3 ${D}${libdir}
 }
 
-FILES:${PN} = "${libdir}/*.so.* ${includedir}/*"
+FILES:${PN} = "${libdir}/*.so.* ${includedir}/* ${libdir}/pkgconfig"
