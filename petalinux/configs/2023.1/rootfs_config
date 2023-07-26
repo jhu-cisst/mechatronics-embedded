@@ -440,7 +440,7 @@ CONFIG_mtd-utils=y
 # bootgen 
 #
 CONFIG_bootgen=y
-# CONFIG_bootgen-dev is not set
+CONFIG_bootgen-dev=y
 # CONFIG_bootgen-dbg is not set
 
 #
