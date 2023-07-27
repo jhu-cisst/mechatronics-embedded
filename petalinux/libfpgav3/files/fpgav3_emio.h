@@ -63,4 +63,30 @@ bool EMIO_WritePromData(struct EMIO_Info *info, char *data, unsigned int nBytes)
 } /* extern "C" */
 #endif
 
+#ifdef __cplusplus
+class EMIO_Interface
+{
+
+    EMIO_Info *info;
+
+public:
+
+    EMIO_Interface()
+    { info = EMIO_Init(); }
+
+    ~EMIO_Interface()
+    { EMIO_Release(info); }
+
+    bool ReadQuadlet(uint16_t addr, uint32_t &data)
+    { return EMIO_ReadQuadlet(info, addr, &data); }
+
+    bool WriteQuadlet(uint16_t addr, uint32_t data)
+    { return EMIO_WriteQuadlet(info, addr, data); }
+
+    bool WritePromData(char *data, unsigned int nBytes)
+    { return EMIO_WritePromData(info, data, nBytes); }
+
+};
+#endif
+
 #endif // FPGAV3_EMIO_H
