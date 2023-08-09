@@ -21,6 +21,7 @@ struct EMIO_Info {
     struct gpiod_line *reg_wen_line;
     struct gpiod_line *blk_wstart_line;
     struct gpiod_line *blk_wen_line;
+    bool isInput;   // true if data lines are input
 };
 
 struct EMIO_Info *EMIO_Init()
@@ -67,6 +68,7 @@ struct EMIO_Info *EMIO_Init()
     }
     // Set all lines to input
     gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init");
+    info->isInput = true;
 
     // Get a group of lines (bits) for reg_addr
     if (gpiod_chip_get_lines(info->chip, reg_addr_offsets, 16, &info->reg_addr_lines) != 0) {
@@ -114,10 +116,13 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
         reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
 
     // Set all data lines to input
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    if (gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init") != 0) {
-        printf("EMIO_ReadQuadlet: could not set data lines as input\n");
-        return false;
+    if (!info->isInput) {
+        gpiod_line_release_bulk(&info->reg_data_lines);
+        if (gpiod_line_request_bulk_input(&info->reg_data_lines, "fpgav3init") != 0) {
+            printf("EMIO_ReadQuadlet: could not set data lines as input\n");
+            return false;
+        }
+        info->isInput = true;
     }
 
     // Write reg_addr (read address)
@@ -161,6 +166,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
         printf("EMIO_WriteQuadlet: could not set data lines as output\n");
         return false;
     }
+    info->isInput = false;
 
     // Write reg_addr (write address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
@@ -184,11 +190,32 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     return true;
 }
 
+// Read block of data
+bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
+{
+    unsigned int nQuads = (nBytes+3)/4;
+    for (unsigned int i = 0; i < nQuads; i++) {
+        if (!EMIO_ReadQuadlet(info, addr+i, &data[i]))
+            return false;
+    }
+    return true;
+}
+
+// Write block of data
+bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
+{
+    unsigned int nQuads = (nBytes+3)/4;
+    for (unsigned int i = 0; i < nQuads; i++) {
+        if (!EMIO_WriteQuadlet(info, addr+i, data[i]))
+            return false;
+    }
+    return true;
+}
+
 bool EMIO_WritePromData(struct EMIO_Info *info, char *data, unsigned int nBytes)
 {
     // Round up to nearest multiple of 4
     uint16_t nQuads = (nBytes+3)/4;
-    nBytes = 4*nQuads;
     for (uint16_t i = 0; i < nQuads; i++) {
         uint32_t qdata = bswap_32(*(uint32_t *)(data+i*4));
         if (!EMIO_WriteQuadlet(info, 0x2000+i, qdata))

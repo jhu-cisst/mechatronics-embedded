@@ -50,6 +50,27 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data);
 // Returns:  true if success
 bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data);
 
+// EMIO_ReadBlock
+//   Reads a block of 32-bit data from the FPGA. This implementation makes multiple
+//   calls to EMIO_ReadQuadlet.
+// Parameters:
+//     addr   16-bit register address
+//     data   pointer to location for storing 32-bit data
+//     nBytes number of bytes to read (rounds up to multiple of 4)
+// Returns:  true if success
+bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes);
+
+// EMIO_WriteBlock
+//   Write a block of 32-bit data to the FPGA. This temporary implementation makes multiple
+//   calls to EMIO_WriteQuadlet, which does not issue all block write signals, such as
+//   blk_wstart and blk_wen.
+// Parameters:
+//     addr   16-bit register address
+//     data   pointer to location that contains 32-bit data
+//     nBytes number of bytes to write (rounds up to multiple of 4)
+// Returns:  true if success
+bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes);
+
 // EMIO_WritePromData
 //   Writes the specified bytes to the PROM registers on the FPGA
 //   (this is intended to be used to copy the FPGA S/N to the PROM).
