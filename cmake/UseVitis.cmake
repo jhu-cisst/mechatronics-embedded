@@ -134,6 +134,9 @@ function (vitis_platform_create ...)
     # VITIS_SYSROOT is directory where Vitis creates a copy of sysroot
     set (VITIS_SYSROOT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/export/${PLATFORM_NAME}/sw/${PLATFORM_NAME}/linux_domain/sysroot")
 
+    set (PLATFORM_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/platform.spr")
+    set (PLATFORM_COPY   "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/cmake.copy")
+
     # Create TCL file
     set (TCL_FILE "${CMAKE_CURRENT_BINARY_DIR}/make-${PLATFORM_NAME}.tcl")
     file (WRITE  ${TCL_FILE} "setws ${CMAKE_CURRENT_BINARY_DIR}\n")
@@ -166,15 +169,22 @@ function (vitis_platform_create ...)
     # Generate the platform (this compiles the BSP libraries)
     file (APPEND ${TCL_FILE} "puts \"Generating platform ...\"\n")
     file (APPEND ${TCL_FILE} "platform generate\n")
+    # Copy PLATFORM_OUTPUT to PLATFORM_COPY
+    file (APPEND ${TCL_FILE} "file copy -force -- ${PLATFORM_OUTPUT} ${PLATFORM_COPY}\n")
 
-    set (PLATFORM_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/platform.spr")
-
-    add_custom_command (OUTPUT ${PLATFORM_OUTPUT}
+    add_custom_command (OUTPUT ${PLATFORM_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_FILE}
+                        COMMENT "Creating ${PLATFORM_NAME}"
                         DEPENDS ${HW_FILE} ${DEPENDENCIES} ${LWIP_PATCH_SOURCE})
 
     add_custom_target(${PLATFORM_NAME} ALL
-                      DEPENDS ${PLATFORM_OUTPUT})
+                      COMMENT "Checking ${PLATFORM_NAME}"
+                      DEPENDS ${PLATFORM_COPY})
+
+    # Cannot use PLATFORM_OUTPUT (platform.spr) as output because its file time is
+    # updated when apps/libs are created
+    set_property(TARGET ${PLATFORM_NAME}
+                        PROPERTY OUTPUT_NAME ${PLATFORM_COPY})
 
   else ()
 
@@ -351,10 +361,12 @@ function (vitis_create OBJECT_TYPE ...)
     # If app or library creation was successful, copy OBJECT_PRJ to OBJECT_PRJ_COPY
     file (APPEND ${TCL_CREATE} "file copy -force -- ${OBJECT_PRJ} ${OBJECT_PRJ_COPY}\n")
 
+    get_property(PLATFORM_OUTPUT TARGET ${PLATFORM_NAME} PROPERTY OUTPUT_NAME)
+
     add_custom_command (OUTPUT ${OBJECT_PRJ_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
                         COMMENT "Creating ${XSCT_CMD} ${OBJECT_NAME}"
-                        DEPENDS ${PLATFORM_NAME})
+                        DEPENDS ${PLATFORM_OUTPUT})
 
     #************** Next, build the app or library ****************
 
@@ -396,7 +408,7 @@ function (vitis_create OBJECT_TYPE ...)
                         DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
 
     add_custom_target(${TARGET_NAME} ALL
-                      DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS} ${DEPENDENCIES})
+                      DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS} ${PLATFORM_NAME} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
                         PROPERTY OUTPUT_NAME ${OBJECT_OUTPUT})

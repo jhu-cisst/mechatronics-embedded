@@ -556,11 +556,21 @@ function (petalinux_build_sdk)
 
   if (TARGET_NAME AND PROJ_NAME AND SDK_INSTALL_DIR)
 
+    set (PETALINUX_GENERATED_DIR    "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-generated")
+    set (PETALINUX_SYSROOT_ZIP_FILE "${PROJ_NAME}-cortexa9-sysroot.zip")
+    set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
+
+    set (README_FILE "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
+    file (WRITE  ${README_FILE} "Directory created by CMake for generated files:\n")
+    file (APPEND ${README_FILE} " - ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
+    file (APPEND ${README_FILE} " - TODO: MicroSD image\n")
+
     # Assume that SDK (sdk.sh) needs to be regenerated if image.ub has been updated
     set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux")
     set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
     set (PETALINUX_SH_FILE    "${PETALINUX_IMAGE_DIR}/sdk.sh")
     set (PETALINUX_SDK_FILE   "${SDK_INSTALL_DIR}/cmake.sdk")
+    set (PETALINUX_SYSROOT_DIR "cortexa9t2hf-neon-xilinx-linux-gnueabi")
 
     add_custom_command (
         OUTPUT ${PETALINUX_SH_FILE}
@@ -580,9 +590,21 @@ function (petalinux_build_sdk)
         COMMENT "Packaging Petalinux SDK"
         DEPENDS ${PETALINUX_SH_FILE})
 
+    # Manually remove some debug files to reduce file size. There may be a better way to do this.
+    # The "|| :" is added to ignore zip errors
+    add_custom_command (
+        OUTPUT ${PETALINUX_SYSROOT_ZIP}
+        COMMAND zip -9 -q -r ${PETALINUX_SYSROOT_ZIP}
+                    ${PETALINUX_SYSROOT_DIR}
+                    -x "*/debug/*" "*/.debug/*" @
+                || :
+        WORKING_DIRECTORY "${SDK_INSTALL_DIR}/sysroots"
+	COMMENT "Creating ${PETALINUX_SYSROOT_ZIP_FILE} from ${PETALINUX_SYSROOT_DIR}"
+        DEPENDS ${PETALINUX_SDK_FILE})
+
     add_custom_target (${TARGET_NAME} ALL
                        COMMENT "Checking Petalinux SDK"
-                       DEPENDS ${PETALINUX_SDK_FILE} ${DEPENDENCIES})
+                       DEPENDS ${PETALINUX_SYSROOT_ZIP} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
                         PROPERTY OUTPUT_NAME ${PETALINUX_SDK_FILE})

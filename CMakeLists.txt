@@ -42,7 +42,7 @@ if (USE_VITIS)
       # If BUILD_PETALINUX_SYSROOT is ON, then PETALINUX_SYSROOT is already set.
       # Otherwise, we set it to a user-specified sysroot.
       set (PETALINUX_SYSROOT_EXTERNAL "" CACHE PATH "Path to external sysroot (from Petalinux)")
-      set (PETALINUX_SYSROOT PETALINUX_SYSROOT_EXTERNAL)
+      set (PETALINUX_SYSROOT ${PETALINUX_SYSROOT_EXTERNAL})
   endif ()
 endif()
 

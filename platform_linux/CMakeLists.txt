@@ -9,15 +9,13 @@ endif (BUILD_FPGAV30)
 
 if (USE_PETALINUX_SYSROOT)
 
-  set (PETALINUX_SDK_FILE "${PETALINUX_SDK}/cmake.sdk")
-
   vitis_platform_create(
       PLATFORM_NAME     ${PLATFORM_LINUX}
       HW_FILE           ${HW_XSA_FILE}
       PROC_NAME         "ps7_cortexa9"
       OS_NAME           "linux"
       SYSROOT           ${PETALINUX_SYSROOT}
-      DEPENDENCIES      ${BLOCK_DESIGN_NAME} ${PETALINUX_SDK_FILE})
+      DEPENDENCIES      ${BLOCK_DESIGN_NAME} ${PETALINUX_SDK_TARGET})
 
 else ()
 
