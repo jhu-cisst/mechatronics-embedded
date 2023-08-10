@@ -86,13 +86,21 @@
 #   - TARGET_NAME        CMake target for building SDK
 #   - PROJ_NAME          Project name
 #   - SDK_INSTALL_DIR    Directory for SDK installation
+#   - SYSROOT_ZIP        Sysroot ZIP file name
 #   - DEPENDENCIES       Build dependencies
 #
 # Description:
 #
 #   This function creates an SDK that can be used to build Petalinux applications in Vitis.
-#   Specifically, create a Linux platform in Vitis and then set the SYSROOT to the appropriate
-#   subdirectory in the SDK (i.e., sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi).
+#   It also creates a ZIP file (SYSROOT_ZIP) of the sysroot for the Zynq target -- this sysroot
+#   is reduced in size by removing a large number of debug files.
+#
+#   To use the SDK/sysroot, create a Linux platform in Vitis and then set the SYSROOT to either:
+#     1) the appropriate subdirectory in the SDK (i.e., sysroots/cortexa9t2hf-neon-xilinx-linux-gnueabi)
+#   or
+#     2) the directory in which SYSROOT_ZIP has been unzipped
+#
+#   The second option is provided for environments where Petalinux is not built (for example, on Windows)
 #
 ##########################################################################################
 #
@@ -536,6 +544,7 @@ function (petalinux_build_sdk)
        TARGET_NAME
        PROJ_NAME
        SDK_INSTALL_DIR
+       SYSROOT_ZIP
        DEPENDENCIES)
 
   # reset local variables
@@ -554,16 +563,7 @@ function (petalinux_build_sdk)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (TARGET_NAME AND PROJ_NAME AND SDK_INSTALL_DIR)
-
-    set (PETALINUX_GENERATED_DIR    "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}-generated")
-    set (PETALINUX_SYSROOT_ZIP_FILE "${PROJ_NAME}-cortexa9-sysroot.zip")
-    set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
-
-    set (README_FILE "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
-    file (WRITE  ${README_FILE} "Directory created by CMake for generated files:\n")
-    file (APPEND ${README_FILE} " - ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
-    file (APPEND ${README_FILE} " - TODO: MicroSD image\n")
+  if (TARGET_NAME AND PROJ_NAME AND SDK_INSTALL_DIR AND SYSROOT_ZIP)
 
     # Assume that SDK (sdk.sh) needs to be regenerated if image.ub has been updated
     set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/images/linux")
@@ -590,21 +590,23 @@ function (petalinux_build_sdk)
         COMMENT "Packaging Petalinux SDK"
         DEPENDS ${PETALINUX_SH_FILE})
 
+    get_filename_component (SYSROOT_ZIP_FILE ${SYSROOT_ZIP} NAME)
+
     # Manually remove some debug files to reduce file size. There may be a better way to do this.
     # The "|| :" is added to ignore zip errors
     add_custom_command (
-        OUTPUT ${PETALINUX_SYSROOT_ZIP}
-        COMMAND zip -9 -q -r ${PETALINUX_SYSROOT_ZIP}
+        OUTPUT ${SYSROOT_ZIP}
+        COMMAND zip -9 -q -r ${SYSROOT_ZIP}
                     ${PETALINUX_SYSROOT_DIR}
                     -x "*/debug/*" "*/.debug/*" @
                 || :
         WORKING_DIRECTORY "${SDK_INSTALL_DIR}/sysroots"
-	COMMENT "Creating ${PETALINUX_SYSROOT_ZIP_FILE} from ${PETALINUX_SYSROOT_DIR}"
+        COMMENT "Creating ${SYSROOT_ZIP_FILE} from ${PETALINUX_SYSROOT_DIR}"
         DEPENDS ${PETALINUX_SDK_FILE})
 
     add_custom_target (${TARGET_NAME} ALL
                        COMMENT "Checking Petalinux SDK"
-                       DEPENDS ${PETALINUX_SYSROOT_ZIP} ${DEPENDENCIES})
+                       DEPENDS ${SYSROOT_ZIP} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
                         PROPERTY OUTPUT_NAME ${PETALINUX_SDK_FILE})

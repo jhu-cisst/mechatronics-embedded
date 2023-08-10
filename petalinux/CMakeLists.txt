@@ -1,4 +1,6 @@
 
+set (PETALINUX_PROJ_NAME "fpgav3")
+
 option (PETALINUX_MENU "Show Petalinux config menus" OFF)
 
 # Directory to custom configuration files: config, rootfs_config and bsp.cfg
@@ -17,7 +19,7 @@ endif ()
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
 
-petalinux_create (PROJ_NAME          "fpgav3"
+petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
                   CONFIG_MENU        ${PETALINUX_MENU}
                   CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
@@ -35,7 +37,7 @@ set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.
 set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
 
 petalinux_app_create (APP_NAME       "libfpgav3"
-                      PROJ_NAME      "fpgav3"
+                      PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${LIBFPGAV3_SOURCES}
                       APP_BB         ${LIBFPGAV3_BB})
 
@@ -47,7 +49,7 @@ set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init
 set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbappend")
 
 petalinux_app_create (APP_NAME       "fpgav3init"
-                      PROJ_NAME      "fpgav3"
+                      PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3INIT_SOURCES}
                       APP_BB         ${FPGAV3INIT_BBAPPEND})
 
@@ -58,7 +60,7 @@ set (FPGAV3SN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/files/fpgav3sn.c")
 set (FPGAV3SN_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/fpgav3sn.bbappend")
 
 petalinux_app_create (APP_NAME       "fpgav3sn"
-                      PROJ_NAME      "fpgav3"
+                      PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3SN_SOURCES}
                       APP_BB         ${FPGAV3SN_BBAPPEND})
 
@@ -68,10 +70,10 @@ set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
 
 # ************************** Petalinux build *******************************
 
-set (PETALINUX_BUILD_TARGET "fpgav3_build")
+set (PETALINUX_BUILD_TARGET "${PETALINUX_PROJ_NAME}_build")
 
 petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
-                 PROJ_NAME           "fpgav3"
+                 PROJ_NAME           ${PETALINUX_PROJ_NAME}
                  CONFIG_MENU         ${PETALINUX_MENU}
                  ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
@@ -79,43 +81,61 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
 
 # *********************** Petalinux SDK (sysroot) **************************
 
+# Directory for generated ZIP files (SD-Image and sysroot)
+set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}-generated")
+
+set (README_GEN "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
+file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
+
 if (BUILD_PETALINUX_SYSROOT)
 
+  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-cortexa9-sysroot.zip")
+  set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
+
+  file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
+
   petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
-                       PROJ_NAME       "fpgav3"
+                       PROJ_NAME       ${PETALINUX_PROJ_NAME}
                        SDK_INSTALL_DIR ${PETALINUX_SDK}
+                       SYSROOT_ZIP     ${PETALINUX_SYSROOT_ZIP}
                        DEPENDENCIES    ${PETALINUX_BUILD_TARGET})
 
 endif ()
 
 if (mechatronics-firmware_FOUND AND Vitis_FOUND)
 
+  set (PETALINUX_MICROSD_ZIP_FILE "${PETALINUX_PROJ_NAME}-micro-sd.zip")
+  set (PETALINUX_MICROSD_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_MICROSD_ZIP_FILE}")
+
+  file (APPEND ${README_GEN} "  ${PETALINUX_MICROSD_ZIP_FILE}: MicroSD image\n")
+
   # Create the MicroSD card image
   set (SD_IMAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/SD_Image")
 
   file (MAKE_DIRECTORY ${SD_IMAGE_DIR})
 
-  set (README_FILE  "${SD_IMAGE_DIR}/ReadMe.txt")
-  file (WRITE   ${README_FILE} "FPGA V3 MicroSD Files:\n\n")
-  file (APPEND  ${README_FILE} "  BOOT.bin:  First-stage boot loader (FSBL), programs BCFG firmware and loads Linux\n")
-  file (APPEND  ${README_FILE} "  boot.scr:  Boot script for u-boot, loads Linux\n")
-  file (APPEND  ${README_FILE} "  image.ub:  Linux kernel image\n")
-  file (APPEND  ${README_FILE} "  *.bit: Firmware for QLA, DQLA or DRAC\n")
-  file (APPEND  ${README_FILE} "  qspi-boot.bin:  First-stage boot loader (FSBL) for QSPI, standalone\n")
-  file (APPEND  ${README_FILE} "  ${ESPM_FIRMWARE_NAME}:  Firmware for ESPM Programmer\n")
-  file (APPEND  ${README_FILE} "  version.txt:  Specifies file versions used to build this image\n\n")
-  file (APPEND  ${README_FILE} "The FPGA V3 boot process begins by loading BOOT.bin, which programs the BCFG firmware and loads Linux.\n")
-  file (APPEND  ${README_FILE} "More precisely, BOOT.bin includes u-boot, which uses boot.scr to load Linux from image.ub.\n")
-  file (APPEND  ${README_FILE} "Once Linux boots, it runs an application, fpgav3init, that queries the BCFG firmware to determine\n")
-  file (APPEND  ${README_FILE} "which board (QLA, DQLA or DRAC) is connected and then loads the appropriate firmware (bit file).\n")
-  file (APPEND  ${README_FILE} "The fpgav3init program performs other initialization tasks, such as copying the FPGA S/N from the\n")
-  file (APPEND  ${README_FILE} "designated QSPI flash partition to registers in the FPGA firmware. It also programs the first QSPI\n")
-  file (APPEND  ${README_FILE} "flash partition with qspi-boot.bin, if the file has not already been programmed. The qspi-boot.bin\n")
-  file (APPEND  ${README_FILE} "provides a first-stage boot loader that programs the BCFG firmware and then loads a simple standalone\n")
-  file (APPEND  ${README_FILE} "application; it is only used when no MicroSD card is inserted.\n\n")
-  file (APPEND  ${README_FILE} "The ${ESPM_FIRMWARE_NAME} file is used by the ESPM programmer. It is stored on this MicroSD card so that\n")
-  file (APPEND  ${README_FILE} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
-  file (APPEND  ${README_FILE} "programmer, in which case all other files are not used.\n")
+  # Following might be better implemented using configure_file
+  set (README_SD  "${SD_IMAGE_DIR}/ReadMe.txt")
+  file (WRITE   ${README_SD} "FPGA V3 MicroSD Files:\n\n")
+  file (APPEND  ${README_SD} "  BOOT.bin:  First-stage boot loader (FSBL), programs BCFG firmware and loads Linux\n")
+  file (APPEND  ${README_SD} "  boot.scr:  Boot script for u-boot, loads Linux\n")
+  file (APPEND  ${README_SD} "  image.ub:  Linux kernel image\n")
+  file (APPEND  ${README_SD} "  *.bit: Firmware for QLA, DQLA or DRAC\n")
+  file (APPEND  ${README_SD} "  qspi-boot.bin:  First-stage boot loader (FSBL) for QSPI, standalone\n")
+  file (APPEND  ${README_SD} "  ${ESPM_FIRMWARE_NAME}:  Firmware for ESPM Programmer\n")
+  file (APPEND  ${README_SD} "  version.txt:  Specifies file versions used to build this image\n\n")
+  file (APPEND  ${README_SD} "The FPGA V3 boot process begins by loading BOOT.bin, which programs the BCFG firmware and loads Linux.\n")
+  file (APPEND  ${README_SD} "More precisely, BOOT.bin includes u-boot, which uses boot.scr to load Linux from image.ub.\n")
+  file (APPEND  ${README_SD} "Once Linux boots, it runs an application, fpgav3init, that queries the BCFG firmware to determine\n")
+  file (APPEND  ${README_SD} "which board (QLA, DQLA or DRAC) is connected and then loads the appropriate firmware (bit file).\n")
+  file (APPEND  ${README_SD} "The fpgav3init program performs other initialization tasks, such as copying the FPGA S/N from the\n")
+  file (APPEND  ${README_SD} "designated QSPI flash partition to registers in the FPGA firmware. It also programs the first QSPI\n")
+  file (APPEND  ${README_SD} "flash partition with qspi-boot.bin, if the file has not already been programmed. The qspi-boot.bin\n")
+  file (APPEND  ${README_SD} "provides a first-stage boot loader that programs the BCFG firmware and then loads a simple standalone\n")
+  file (APPEND  ${README_SD} "application; it is only used when no MicroSD card is inserted.\n\n")
+  file (APPEND  ${README_SD} "The ${ESPM_FIRMWARE_NAME} file is used by the ESPM programmer. It is stored on this MicroSD card so that\n")
+  file (APPEND  ${README_SD} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
+  file (APPEND  ${README_SD} "programmer, in which case all other files are not used.\n")
 
   set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
   file (WRITE   ${VERSION_FILE} "mechatronics-embedded ${EMBEDDED_VERSION}\n")
@@ -124,7 +144,7 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${VERSION_FILE} "fpga-hw               ${FPGA_VERSION}\n")
   file (APPEND  ${VERSION_FILE} "espm-firmware         ${ESPM_FIRMWARE_VERSION}\n")
 
-  set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/fpgav3/images/linux")
+  set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}/images/linux")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")
 
   add_custom_target (MicroSDImage ALL
@@ -147,7 +167,17 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                              ${ESPM_FIRMWARE_FILE}
                              ${SD_IMAGE_DIR}
                      COMMENT "Creating MicroSD Image"
-                     DEPENDS "fpgav3_build")
+                     DEPENDS "${PETALINUX_BUILD_TARGET}")
+
+  add_custom_command (OUTPUT ${PETALINUX_MICROSD_ZIP}
+                      COMMAND zip -9 -q ${PETALINUX_MICROSD_ZIP} *
+                      WORKING_DIRECTORY ${SD_IMAGE_DIR}
+                      COMMENT "Creating ${PETALINUX_MICROSD_ZIP_FILE}"
+                      DEPENDS "MicroSDImage")
+
+  add_custom_target (MicroSDzip ALL
+                     COMMENT "Checking MicroSD Zip"
+                     DEPENDS ${PETALINUX_MICROSD_ZIP})
 
 else ()
 
