@@ -33,13 +33,18 @@ There are two supported platforms (and domains):
 
    1. Standalone (`platform_standalone`): This platform/domain is for applications that do not use an operating system (i.e., "bare metal" applications) and it includes the ability to  use the Vitis bootgen tool to create the BOOT.bin file that can be written to the MicroSD card. This is mainly useful for low-level testing.
 
-   2. Linux (`platform_linux`): This platform/domain is for applications that run on the Petalinux system. Although it is possible to add Linux applications to the Petalinux build (see below), it is usually more convenient to develop them here.
+   2. Linux (`platform_linux`): This platform/domain is for applications that run on the Petalinux system. Although it is possible to add Linux applications to the Petalinux build (see below), it is usually more convenient to develop them here. It is recommended to use the petalinux-generated sysroot (see `fpgav3-sysroot-cortexa9.zip` below) rather than the default sysroot.
 
 3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above. The source files are in the `petalinux` sub-directory.
 
 ## Output Files
 
-The relevant output files are placed into the petalinux/SD_Image directory in the build tree and should be copied to the MicroSD card:
+The Release files consist of two ZIP files in the petalinux/fpgav3-generated directory:
+
+  * `fpgav3-micro-sd.zip` -- Contains all files to be copied to MicroSD card (see below)
+  * `fpgav3-sysroot-cortexa9.zip` -- Sysroot for cross-compiling Linux applications for Zynq ARM processor
+
+The `fpgav3-micro-sd.zip` file contains the following files, which are also available in the petalinux/SD_Image directory in the build tree:
 
   * `BOOT.bin` -- first stage boot loader
   * `boot.scr` -- U-boot script file
@@ -50,13 +55,15 @@ The relevant output files are placed into the petalinux/SD_Image directory in th
   * `qspi-boot.bin` -- standalone first stage boot loader to copy to QSPI flash
   * `espm.xsvf` -- firmware for ESPM in dVRK-Si arm (PSM or ECM)
   * `version.txt` -- text file containing version information
+  * `ReadMe.txt` -- text file describing all files
 
 Note that the `fpgav3init` application compiled with the Linux kernel will autorun at startup, detect the connected board and then load the appropriate firmware (`bit` file). It will also copy `qspi-boot.bin` to the first partition in the flash, if not already there.
 
 ## Release Notes
 
-  * Rev 1.0.0 (June 2023)
+  * Rev 1.0.0 (August 10, 2023)
     * Initial Release
+    * Uses Firmware Rev 8
     * Output files built with Xilinx 2023.1 tools on Ubuntu 20.04
 
 ## Xilinx Tool Version Dependencies

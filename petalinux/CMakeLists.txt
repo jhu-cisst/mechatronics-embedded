@@ -89,7 +89,7 @@ file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
 
 if (BUILD_PETALINUX_SYSROOT)
 
-  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-cortexa9-sysroot.zip")
+  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-sysroot-cortexa9.zip")
   set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
 
   file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
