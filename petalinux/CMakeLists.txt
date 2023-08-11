@@ -169,15 +169,23 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMENT "Creating MicroSD Image"
                      DEPENDS "${PETALINUX_BUILD_TARGET}")
 
+  set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
+                     "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin")
+
+  foreach (bit_file ${FPGAV3_HW_BIT_FILES})
+    get_filename_component (bit_file_name ${bit_file} NAME)
+    set (MICROSD_FILES ${MICROSD_FILES} "${SD_IMAGE_DIR}/${bit_file_name}")
+  endforeach (bit_file)
+
   add_custom_command (OUTPUT ${PETALINUX_MICROSD_ZIP}
                       COMMAND zip -9 -q ${PETALINUX_MICROSD_ZIP} *
                       WORKING_DIRECTORY ${SD_IMAGE_DIR}
                       COMMENT "Creating ${PETALINUX_MICROSD_ZIP_FILE}"
-                      DEPENDS "MicroSDImage")
+                      DEPENDS ${MICROSD_FILES})
 
   add_custom_target (MicroSDzip ALL
                      COMMENT "Checking MicroSD Zip"
-                     DEPENDS ${PETALINUX_MICROSD_ZIP})
+                     DEPENDS "MicroSDImage" ${PETALINUX_MICROSD_ZIP})
 
 else ()
 
