@@ -190,3 +190,37 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
   file (APPEND ${CONFIG_FILE} "set (PETALINUX_SYSROOT      \"${PETALINUX_SYSROOT}\")\n\n")
 endif ()
 file (APPEND ${CONFIG_FILE} "set (Xilinx_VERSION   ${Xilinx_VERSION})\n")
+
+#
+# Mechatronics toolchain for FPGA V3
+#
+# Usage:  cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_vitis_fpgav3.cmake  <path-to-source>
+
+
+if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
+
+  # Create a custom toolchain file for cross-compiling
+  set (TOOLCHAIN_FILE "${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake")
+  file (WRITE  ${TOOLCHAIN_FILE} "#\n# Toolchain file for FPGA V3\n#\n")
+  file (APPEND ${TOOLCHAIN_FILE} "# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake"
+                                 "  <path-to-source>\n\n")
+  file (APPEND ${TOOLCHAIN_FILE} "set (Sysroot ${PETALINUX_SYSROOT})\n")
+  file (APPEND ${TOOLCHAIN_FILE} "set (VITIS_ROOT ${VITIS_ROOT})\n")
+  file (APPEND ${TOOLCHAIN_FILE} "\n# Following is patched version from Xilinx repository\n\n")
+
+  # Fetch the Xilinx CMake modules
+  include (FetchContent)
+  FetchContent_Declare (xilinx_cmake
+                        GIT_REPOSITORY https://github.com/Xilinx/cmakeModules/
+                        GIT_TAG 7915d8fa4d2869bdbc078b9d266a555b72c2ebb2)
+  FetchContent_MakeAvailable (xilinx_cmake)
+
+  # Apply some patches (using CMake string replacement rather than PATCH_COMMAND)
+  file (READ ${xilinx_cmake_SOURCE_DIR}/toolchain_vitis_crosscomp_arm.cmake FILE_CONTENTS)
+  # Change default Arch to "arm32"
+  string (REPLACE "Arch \"arm64\"" "Arch \"arm32\"" FILE_CONTENTS "${FILE_CONTENTS}")
+  # Remove call to find_package(Vitis) since we already define VITIS_ROOT
+  string (REPLACE "find_package" "# find_package" FILE_CONTENTS "${FILE_CONTENTS}")
+  file (APPEND ${TOOLCHAIN_FILE} "${FILE_CONTENTS}")
+
+endif ()

@@ -34,6 +34,10 @@ struct EMIO_Info *EMIO_Init();
 // Release the resources allocated by EMIO_Init
 void EMIO_Release(struct EMIO_Info *info);
 
+// Get/Set verbose flag (true -> prints messages when waiting for FPGA I/O to complete)
+bool EMIO_GetVerbose(struct EMIO_Info *info);
+void EMIO_SetVerbose(struct EMIO_Info *info, bool newState);
+
 // EMIO_ReadQuadlet
 //   Reads a quadlet (32-bit register) from the FPGA.
 // Parameters:
@@ -97,6 +101,12 @@ public:
 
     ~EMIO_Interface()
     { EMIO_Release(info); }
+
+    bool GetVerbose()
+    { return EMIO_GetVerbose(info); }
+
+    void SetVerbose(bool newState)
+    { EMIO_SetVerbose(info, newState); }
 
     bool ReadQuadlet(uint16_t addr, uint32_t &data)
     { return EMIO_ReadQuadlet(info, addr, &data); }

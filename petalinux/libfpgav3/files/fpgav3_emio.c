@@ -22,6 +22,7 @@ struct EMIO_Info {
     struct gpiod_line *blk_wstart_line;
     struct gpiod_line *blk_wen_line;
     bool isInput;   // true if data lines are input
+    bool isVerbose; // true if error messages should be printed
 };
 
 struct EMIO_Info *EMIO_Init()
@@ -52,6 +53,7 @@ struct EMIO_Info *EMIO_Init()
     reg_wen_offset = INDEX_EMIO_START+50;
     blk_wstart_offset = INDEX_EMIO_START+51;
     blk_wen_offset = INDEX_EMIO_START+52;
+    info->isVerbose = true;
 
     // First, open the chip
     info->chip = gpiod_chip_open("/dev/gpiochip0");
@@ -105,6 +107,16 @@ void EMIO_Release(struct EMIO_Info *info)
     free(info);
 }
 
+bool EMIO_GetVerbose(struct EMIO_Info *info)
+{
+    return info->isVerbose;
+}
+
+void EMIO_SetVerbose(struct EMIO_Info *info, bool newState)
+{
+    info->isVerbose = newState;
+}
+
 // EMIO_ReadQuadlet: read quadlet from specified address
 bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
 {
@@ -132,11 +144,16 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     // op_done should be set quickly by firmware, to indicate
     // that read has completed
     if (gpiod_line_get_value(info->op_done_line) != 1) {
-        printf("Waiting to read");
         // Should set a timeout for following while loop
-        while (gpiod_line_get_value(info->op_done_line) != 1)
-            printf(".");
-        printf("\n");
+        if (info->isVerbose) {
+            printf("Waiting to read");
+            while (gpiod_line_get_value(info->op_done_line) != 1)
+                printf(".");
+            printf("\n");
+        }
+        else {
+            while (gpiod_line_get_value(info->op_done_line) != 1);
+        }
     }
     // Read data from reg_data
     gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
@@ -179,11 +196,16 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     // op_done should be set quickly by firmware, to indicate
     // that write has completed
     if (gpiod_line_get_value(info->op_done_line) != 1) {
-        printf("Waiting to write");
         // Should set a timeout for following while loop
-        while (gpiod_line_get_value(info->op_done_line) != 1)
-            printf(".");
-        printf("\n");
+        if (info->isVerbose) {
+            printf("Waiting to write");
+            while (gpiod_line_get_value(info->op_done_line) != 1)
+                printf(".");
+            printf("\n");
+        }
+        else {
+            while (gpiod_line_get_value(info->op_done_line) != 1);
+        }
     }
     // Set req_bus to 0
     gpiod_line_set_value(info->req_bus_line, 0);
