@@ -40,9 +40,18 @@ if (USE_VITIS)
   option (USE_PETALINUX_SYSROOT "Use Petalinux sysroot in Vitis" OFF)
   if (USE_PETALINUX_SYSROOT AND NOT BUILD_PETALINUX_SYSROOT)
       # If BUILD_PETALINUX_SYSROOT is ON, then PETALINUX_SYSROOT is already set.
-      # Otherwise, we set it to a user-specified sysroot.
-      set (PETALINUX_SYSROOT_EXTERNAL "" CACHE PATH "Path to external sysroot (from Petalinux)")
-      set (PETALINUX_SYSROOT ${PETALINUX_SYSROOT_EXTERNAL})
+      # Otherwise, we set it to a user-specified sysroot, which defaults to the latest release
+      set (PETALINUX_SYSROOT_EXTERNAL
+           "https://github.com/jhu-cisst/mechatronics-embedded/releases/latest/download/fpgav3-sysroot-cortexa9.zip"
+           CACHE STRING "URL or path to external sysroot (from Petalinux)")
+      include (ExternalProject)
+      ExternalProject_Add (sysroot_external
+                           URL ${PETALINUX_SYSROOT_EXTERNAL}
+                           CONFIGURE_COMMAND ""
+                           BUILD_COMMAND ""
+                           INSTALL_COMMAND "")
+      ExternalProject_Get_property(sysroot_external SOURCE_DIR)
+      set (PETALINUX_SYSROOT ${SOURCE_DIR})
   endif ()
 endif()
 
