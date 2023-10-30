@@ -201,10 +201,13 @@ endif ()
 file (APPEND ${CONFIG_FILE} "set (Xilinx_VERSION   ${Xilinx_VERSION})\n")
 
 #
-# Mechatronics toolchain for FPGA V3
+# Mechatronics toolchain files for FPGA V3
 #
-# Usage:  cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_vitis_fpgav3.cmake  <path-to-source>
-
+# To cross-compile with Vitis:
+#    cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_vitis_fpgav3.cmake  <path-to-source>
+#
+# To cross-compile with clang:
+#    cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_clang_fpgav3.cmake  <path-to-source>
 
 if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
 
@@ -231,5 +234,15 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
   # Remove call to find_package(Vitis) since we already define VITIS_ROOT
   string (REPLACE "find_package" "# find_package" FILE_CONTENTS "${FILE_CONTENTS}")
   file (APPEND ${TOOLCHAIN_FILE} "${FILE_CONTENTS}")
+
+endif ()
+
+if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
+
+  set (GCC_VERSION "12.2.0")   # Xilinx 2023.1
+
+  configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain_clang_fpgav3.cmake.in"
+                  "${CMAKE_CURRENT_BINARY_DIR}/toolchain_clang_fpgav3.cmake"
+                  @ONLY)
 
 endif ()
