@@ -596,9 +596,10 @@ function (petalinux_build_sdk)
     # The "|| :" is added to ignore zip errors
     add_custom_command (
         OUTPUT ${SYSROOT_ZIP}
+        COMMAND ${CMAKE_COMMAND} -E remove -f ${SYSROOT_ZIP}
         COMMAND zip -9 -q -r ${SYSROOT_ZIP}
                     ${PETALINUX_SYSROOT_DIR}
-                    -x "*/debug/*" "*/.debug/*" @
+                    -x \"${PETALINUX_SYSROOT_DIR}/usr/src/debug/*\" \"\*/.debug/*\" @
                 || :
         WORKING_DIRECTORY "${SDK_INSTALL_DIR}/sysroots"
         COMMENT "Creating ${SYSROOT_ZIP_FILE} from ${PETALINUX_SYSROOT_DIR}"
