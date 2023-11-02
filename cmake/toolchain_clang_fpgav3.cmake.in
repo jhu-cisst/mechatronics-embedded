@@ -52,12 +52,7 @@ set (CMAKE_CXX_COMPILER        "clang++${CLANG_SUFFIX}")
 set (CMAKE_CXX_COMPILER_TARGET ${gnuArch})
 set (CMAKE_ASM_COMPILER        "clang${CLANG_SUFFIX}")
 set (CMAKE_STRIP               "llvm-strip${CLANG_SUFFIX}")
-
-if (APPLE)
-  set (CLANG_LINKER "ld")
-else ()
-  set (CLANG_LINKER "lld${CLANG_SUFFIX}")
-endif ()
+set (CLANG_LINKER              "lld${CLANG_SUFFIX}")
 
 ##################################################################
 # Set up cross compilation paths
