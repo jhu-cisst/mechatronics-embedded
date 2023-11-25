@@ -53,7 +53,7 @@ struct EMIO_Info *EMIO_Init()
     reg_wen_offset = INDEX_EMIO_START+50;
     blk_wstart_offset = INDEX_EMIO_START+51;
     blk_wen_offset = INDEX_EMIO_START+52;
-    info->isVerbose = true;
+    info->isVerbose = false;
 
     // First, open the chip
     info->chip = gpiod_chip_open("/dev/gpiochip0");
@@ -212,25 +212,239 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     return true;
 }
 
-// Read block of data
-bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
+// Real-time block read
+//
+// The real-time block read (i.e., read from address 0) is handled as a special case.
+// It assumes Firmware Rev 8 (since older firmware versions are not supported on Zynq).
+// This implementation assumes the following based on the number of quadlets:
+//       nQuads = 4 + 2*NumMotors + 5*NumEncoders
+// BCFG: NumMotors = NumEncoders = 0     --> nQuads = 4
+// QLA:  NumMotors = NumEncoders = 4     --> nQuads = 32
+// DQLA: NumMotors = NumEncoders = 8     --> nQuads = 60
+// DRAC: NumMotors = 10, NumEncoders = 7 --> nQuads = 59
+//
+bool EMIO_ReadBlockRt(struct EMIO_Info *info, uint32_t *data, unsigned int nQuads)
 {
-    unsigned int nQuads = (nBytes+3)/4;
-    for (unsigned int i = 0; i < nQuads; i++) {
-        if (!EMIO_ReadQuadlet(info, addr+i, &data[i]))
+    unsigned int i, j;
+    unsigned int nMotors;
+    unsigned int nEncoders;
+
+    if (nQuads == 59) {
+        nMotors = 10;
+        nEncoders = 7;
+    }
+    else {
+        // No error checking (if nQuads is not 4, 32 or 60)
+        nMotors = (nQuads-4)/7;
+        nEncoders = nMotors;
+    }
+    unsigned int idx = 0;
+    data[idx++] = 0;         // Cannot read timestamp
+    uint32_t val;
+    if (!EMIO_ReadQuadlet(info,  0, &val))  // Status
+        return false;
+    data[idx++] = bswap_32(val);
+    if (!EMIO_ReadQuadlet(info, 10, &val))  // Digital I/O
+        return false;
+    data[idx++] = bswap_32(val);
+    if (!EMIO_ReadQuadlet(info,  5, &val))  // Temperature
+        return false;
+    data[idx++] = bswap_32(val);
+    for (i = 0; i < nMotors; i++) {
+        // Register 0: ADC (pot+cur)
+        if (!EMIO_ReadQuadlet(info,  ((i+1)<<4), &val))
             return false;
+        data[idx++] = bswap_32(val);
+    }
+    for (j= 0; j < 5; j++) {
+        // Encoder register offsets: 5,6,7,9,10
+        uint16_t off = (j < 3) ? (5 + j) : (6 + j);
+        for (i = 0; i < nEncoders; i++) {
+            if (!EMIO_ReadQuadlet(info,  ((i+1)<<4)|off, &val))
+                return false;
+            data[idx++] = bswap_32(val);
+        }
+    }
+    for (i = 0; i < nMotors; i++) {
+        // Register 12: Motor Status
+        if (!EMIO_ReadQuadlet(info,  ((i+1)<<4)|12, &val))
+            return false;
+        data[idx++] = bswap_32(val);
     }
     return true;
 }
 
-// Write block of data
+// Read block of data
+//
+bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
+{
+    unsigned int i;
+    unsigned int nQuads = (nBytes+3)/4;
+
+    if (addr == 0) {
+        // Real-time block read
+        return EMIO_ReadBlockRt(info, data, nQuads);
+    }
+    else {
+        // Regular block read
+        uint32_t val;
+        for (i = 0; i < nQuads; i++) {
+            if (!EMIO_ReadQuadlet(info, addr+i, &val))
+                return false;
+            data[i] = bswap_32(val);
+        }
+    }
+    return true;
+}
+
+// Real-time block write
+//
+// The real-time block write (i.e., write to address 0) is handled as a special case.
+// It assumes Firmware Rev 8 (since older firmware versions are not supported on Zynq)
+// and does not check validity of the real-time block write header.
+// It essentially replicates code from WriteRtData.v
+//
+// Due to the poor support for block write via EMIO, and the possibility of bus conflicts
+// with Firewire or Ethernet, this implementation instead uses multiple quadlet writes.
+//
+bool EMIO_WriteBlockRt(struct EMIO_Info *info, uint32_t *data, unsigned int nQuads)
+{
+    unsigned int i;
+
+    // Check number of quadlets specified in header
+    // We should also check board id
+    unsigned int headerQuads = bswap_32(data[0])&0x000000ff;
+    if (headerQuads != nQuads) {
+        printf("EMIO_WriteBlockRt: header quadlets %d does not match expected value %d\n",
+               headerQuads, nQuads);
+        return false;
+    }
+
+    bool noDacWrite = true;
+    for (i = 1; i < nQuads-1; i++) {
+        // Write out DAC values, if DAC valid bit (31) or
+        // AmpEn mask (29) are set
+        uint32_t dac = bswap_32(data[i]);
+        if (dac&0xa0000000) {
+            noDacWrite = false;
+            if (!EMIO_WriteQuadlet(info, ((i<<4)|1), dac))
+                return false;
+        }
+    }
+    // The last quadlet is the power control register.
+    // We need to write this if the lower 20 bits are non-zero, or
+    // if there was no DAC write (to refresh watchdog).
+    bool ret = true;
+    uint32_t ctrl = bswap_32(data[nQuads-1]);
+    if (noDacWrite || ((ctrl&0x000fffff) != 0))
+        ret = EMIO_WriteQuadlet(info, 0, ctrl);
+    return ret;
+}
+
+// Write block of data.
+//
+// This is a fragile implementation that should be improved; probably by also improving
+// the firmware. In particular, there is no feedback about when the write bus has actually
+// been obtained, and there is no good way to control the timing of the control signals
+// (blk_wstart, reg_wen and blk_wen).
+//
 bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
 {
+    int reg_wdata_values[32];
+    int reg_addr_values[16];
+    unsigned int i, q;
+
     unsigned int nQuads = (nBytes+3)/4;
-    for (unsigned int i = 0; i < nQuads; i++) {
-        if (!EMIO_WriteQuadlet(info, addr+i, data[i]))
-            return false;
+
+    if (addr == 0) {
+        // Special case for real-time block write
+        return EMIO_WriteBlockRt(info, data, nQuads);
     }
+
+    uint32_t val = bswap_32(data[0]);
+    for (i = 0; i < 32; i++)
+        reg_wdata_values[i] = (val&(0x80000000>>i)) ? 1 : 0;
+
+    // Set all data lines to output and write values
+    gpiod_line_release_bulk(&info->reg_data_lines);
+    if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
+        printf("EMIO_WriteBlock: could not set data lines as output\n");
+        return false;
+    }
+    info->isInput = false;
+
+    // Set blk_wstart to 1
+    gpiod_line_set_value(info->blk_wstart_line, 1);
+
+    // Set req_bus to 1
+    gpiod_line_set_value(info->req_bus_line, 1);
+
+    // Unfortunately, we do not know when we get the bus.
+    // For now, we just continue and hope for the best.
+    // Note that we clear blk_wstart in the loop below,
+    // with the hope that it has been asserted long enough.
+
+    for (unsigned int q = 0; q < nQuads; q++) {
+
+        for (i = 0; i < 16; i++)
+            reg_addr_values[i] = ((addr+q)&(0x8000>>i)) ? 1 : 0;
+
+        val = bswap_32(data[q]);
+        for (i = 0; i < 32; i++)
+            reg_wdata_values[i] = (val&(0x80000000>>i)) ? 1 : 0;
+
+        if (q == 0) {
+            // Set blk_wstart to 0
+            gpiod_line_set_value(info->blk_wstart_line, 0);
+        }
+
+        // Write reg_addr (write address)
+        gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+
+        // Write reg_data
+        gpiod_line_set_value_bulk(&info->reg_data_lines, reg_wdata_values);
+
+        // Set reg_wen to 1
+        gpiod_line_set_value(info->reg_wen_line, 1);
+
+        // op_done should be set quickly by firmware, to indicate
+        // that write has completed
+        if (gpiod_line_get_value(info->op_done_line) != 1) {
+            // Should set a timeout for following while loop
+            if (info->isVerbose) {
+                printf("Waiting to write");
+                while (gpiod_line_get_value(info->op_done_line) != 1)
+                    printf(".");
+                printf("\n");
+            }
+            else {
+                while (gpiod_line_get_value(info->op_done_line) != 1);
+            }
+        }
+        // Add a little delay
+        gpiod_line_set_value(info->reg_wen_line, 1);
+
+        // Set reg_wen to 0
+        gpiod_line_set_value(info->reg_wen_line, 0);
+    }
+
+    // Should wait 60 ns; for now, just waste some time
+    for (i = 0; i < 10; i++)
+        gpiod_line_set_value(info->reg_wen_line, 0);
+
+    // Set blk_wen to 1
+    gpiod_line_set_value(info->blk_wen_line, 1);
+
+    // Wait 20 ns; for now, just waste some time
+    for (i = 0; i < 3; i++)
+        gpiod_line_set_value(info->blk_wen_line, 1);
+
+    // Set blk_wen to 0
+    gpiod_line_set_value(info->blk_wen_line, 0);
+
+    // Set req_bus to 0
+    gpiod_line_set_value(info->req_bus_line, 0);
+
     return true;
 }
 
