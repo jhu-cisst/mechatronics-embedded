@@ -117,6 +117,23 @@ void EMIO_SetVerbose(struct EMIO_Info *info, bool newState)
     info->isVerbose = newState;
 }
 
+// Local method to wait for op_done line to be set
+static void WaitOpDone(struct EMIO_Info *info, const char *opType)
+{
+    if (gpiod_line_get_value(info->op_done_line) != 1) {
+        // Should set a timeout for following while loop
+        if (info->isVerbose) {
+            printf("Waiting to %s", opType);
+            while (gpiod_line_get_value(info->op_done_line) != 1)
+                printf(".");
+            printf("\n");
+        }
+        else {
+            while (gpiod_line_get_value(info->op_done_line) != 1);
+        }
+    }
+}
+
 // EMIO_ReadQuadlet: read quadlet from specified address
 bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
 {
@@ -143,18 +160,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     gpiod_line_set_value(info->req_bus_line, 1);
     // op_done should be set quickly by firmware, to indicate
     // that read has completed
-    if (gpiod_line_get_value(info->op_done_line) != 1) {
-        // Should set a timeout for following while loop
-        if (info->isVerbose) {
-            printf("Waiting to read");
-            while (gpiod_line_get_value(info->op_done_line) != 1)
-                printf(".");
-            printf("\n");
-        }
-        else {
-            while (gpiod_line_get_value(info->op_done_line) != 1);
-        }
-    }
+    WaitOpDone(info, "read");
     // Read data from reg_data
     gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
     // Set req_bus to 0
@@ -177,13 +183,19 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     for (i = 0; i < 32; i++)
         reg_wdata_values[i] = (data&(0x80000000>>i)) ? 1 : 0;
 
-    // Set all data lines to output and write values
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
-        printf("EMIO_WriteQuadlet: could not set data lines as output\n");
-        return false;
+    if (info->isInput) {
+        // Set all data lines to output and write values
+        gpiod_line_release_bulk(&info->reg_data_lines);
+        if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
+            printf("EMIO_WriteQuadlet: could not set data lines as output\n");
+            return false;
+        }
+        info->isInput = false;
     }
-    info->isInput = false;
+    else {
+        // Output already set, just write values
+        gpiod_line_set_value_bulk(&info->reg_data_lines, reg_wdata_values);
+    }
 
     // Write reg_addr (write address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
@@ -195,18 +207,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     gpiod_line_set_value(info->req_bus_line, 1);
     // op_done should be set quickly by firmware, to indicate
     // that write has completed
-    if (gpiod_line_get_value(info->op_done_line) != 1) {
-        // Should set a timeout for following while loop
-        if (info->isVerbose) {
-            printf("Waiting to write");
-            while (gpiod_line_get_value(info->op_done_line) != 1)
-                printf(".");
-            printf("\n");
-        }
-        else {
-            while (gpiod_line_get_value(info->op_done_line) != 1);
-        }
-    }
+    WaitOpDone(info, "write");
     // Set req_bus to 0
     gpiod_line_set_value(info->req_bus_line, 0);
     return true;
@@ -365,13 +366,17 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
     for (i = 0; i < 32; i++)
         reg_wdata_values[i] = (val&(0x80000000>>i)) ? 1 : 0;
 
-    // Set all data lines to output and write values
-    gpiod_line_release_bulk(&info->reg_data_lines);
-    if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
-        printf("EMIO_WriteBlock: could not set data lines as output\n");
-        return false;
+    if (info->isInput) {
+        // Set all data lines to output (and write values)
+        // It is not necesssary to write values if the lines are already output,
+        // since reg_wdata_values will be set later
+        gpiod_line_release_bulk(&info->reg_data_lines);
+        if (gpiod_line_request_bulk_output(&info->reg_data_lines, "fpgav3init", reg_wdata_values) != 0) {
+            printf("EMIO_WriteBlock: could not set data lines as output\n");
+            return false;
+        }
+        info->isInput = false;
     }
-    info->isInput = false;
 
     // Set blk_wstart to 1
     gpiod_line_set_value(info->blk_wstart_line, 1);
@@ -409,18 +414,7 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
         // op_done should be set quickly by firmware, to indicate
         // that write has completed
-        if (gpiod_line_get_value(info->op_done_line) != 1) {
-            // Should set a timeout for following while loop
-            if (info->isVerbose) {
-                printf("Waiting to write");
-                while (gpiod_line_get_value(info->op_done_line) != 1)
-                    printf(".");
-                printf("\n");
-            }
-            else {
-                while (gpiod_line_get_value(info->op_done_line) != 1);
-            }
-        }
+        WaitOpDone(info, "write");
         // Add a little delay
         gpiod_line_set_value(info->reg_wen_line, 1);
 
