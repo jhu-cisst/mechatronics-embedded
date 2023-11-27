@@ -59,6 +59,12 @@ The `fpgav3-micro-sd.zip` file contains the following files, which are also avai
 
 Note that the `fpgav3init` application compiled with the Linux kernel will autorun at startup, detect the connected board and then load the appropriate firmware (`bit` file). It will also copy `qspi-boot.bin` to the first partition in the flash, if not already there.
 
+## Deploying to MicroSD card
+
+The contents of fpgav3-micro-sd.zip should be extracted to a FAT32 partition on the MicroSD card used with FPGA V3.
+Note that for MicroSD cards greater than 32 GB, it may be difficult to format as FAT32; for example, Windows
+only provides the option to format as exFAT or NTFS.
+
 ## Release Notes
 
   * Rev 1.0.1 (November 27, 2023)
