@@ -61,6 +61,13 @@ Note that the `fpgav3init` application compiled with the Linux kernel will autor
 
 ## Release Notes
 
+  * Rev 1.0.1 (November 26, 2023)
+    * Create toolchain files to cross-compile with Vitis or clang
+    * Support use of sysroot from GitHub release
+    * Added EMIO_GetVerbose and EMIO_SetVerbose methods
+    * Implemented real-time block read and write of FPGA registers via EMIO
+    * ESPM Firmware Version 2, which improves reliability of reading instrument id
+
   * Rev 1.0.0 (August 10, 2023)
     * Initial Release
     * Uses Firmware Rev 8
