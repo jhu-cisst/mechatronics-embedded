@@ -10,17 +10,20 @@
 const unsigned int INDEX_EMIO_START = 54;
 const unsigned int INDEX_EMIO_END = 118;
 
+enum { CTRL_REQ_BUS, CTRL_REG_WEN, CTRL_BLK_WSTART, CTRL_BLK_WEN, CTRL_MAX };
+
+int ctrl_zero[CTRL_MAX];    // all 0
+int ctrl_qwrite[CTRL_MAX];  // quadlet write (req_bus, reg_wen, blk_wen)
+int ctrl_reqbus[CTRL_MAX];  // req_bus
+
 // GPIO (EMIO) access to FPGA registers
 
 struct EMIO_Info {
     struct gpiod_chip *chip;
     struct gpiod_line_bulk reg_data_lines;
     struct gpiod_line_bulk reg_addr_lines;
-    struct gpiod_line *req_bus_line;
-    struct gpiod_line *op_done_line;
-    struct gpiod_line *reg_wen_line;
-    struct gpiod_line *blk_wstart_line;
-    struct gpiod_line *blk_wen_line;
+    struct gpiod_line      *op_done_line;
+    struct gpiod_line_bulk ctrl_lines;
     bool isInput;   // true if data lines are input
     bool isVerbose; // true if error messages should be printed
 };
@@ -34,6 +37,7 @@ struct EMIO_Info *EMIO_Init()
     unsigned int reg_wen_offset;
     unsigned int blk_wstart_offset;
     unsigned int blk_wen_offset;
+    unsigned int ctrl_offsets[CTRL_MAX];
     int reg_addr_values[16];
 
     struct EMIO_Info *info;
@@ -48,11 +52,34 @@ struct EMIO_Info *EMIO_Init()
         reg_addr_offsets[i] = INDEX_EMIO_START+47-i;
         reg_addr_values[i] = 0;
     }
+    for (i = 0; i < CTRL_MAX; i++) {
+        ctrl_zero[i] = 0;
+        ctrl_qwrite[i] = 0;
+        ctrl_reqbus[i] = 0;
+    }
+
+    // For quadlet write, set reg_wen, blk_wen and req_bus to 1
+    // Rising edge of req_bus requests firmware to write register; note that this
+    // can be set at the same time as the other signals because it is delayed in
+    // the firmware.
+    ctrl_qwrite[CTRL_REQ_BUS] = 1;
+    ctrl_qwrite[CTRL_REG_WEN] = 1;
+    ctrl_qwrite[CTRL_BLK_WEN] = 1;
+
+    ctrl_reqbus[CTRL_REQ_BUS] = 1;
+
     req_bus_offset = INDEX_EMIO_START+48;
     op_done_offset = INDEX_EMIO_START+49;
     reg_wen_offset = INDEX_EMIO_START+50;
     blk_wstart_offset = INDEX_EMIO_START+51;
     blk_wen_offset = INDEX_EMIO_START+52;
+
+    // Ctrl offsets
+    ctrl_offsets[CTRL_REQ_BUS] = req_bus_offset;
+    ctrl_offsets[CTRL_REG_WEN] = reg_wen_offset;
+    ctrl_offsets[CTRL_BLK_WSTART] = blk_wstart_offset;
+    ctrl_offsets[CTRL_BLK_WEN] = blk_wen_offset;
+
     info->isVerbose = false;
 
     // First, open the chip
@@ -81,20 +108,17 @@ struct EMIO_Info *EMIO_Init()
     // Set all lines to output, initialized to 0
     gpiod_line_request_bulk_output(&info->reg_addr_lines, "fpgav3init", reg_addr_values);
 
-    info->req_bus_line = gpiod_chip_get_line(info->chip, req_bus_offset);
-    gpiod_line_request_output(info->req_bus_line, "fpgav3init", 0);
-
     info->op_done_line = gpiod_chip_get_line(info->chip, op_done_offset);
     gpiod_line_request_input(info->op_done_line, "fpgav3init");
 
-    info->reg_wen_line = gpiod_chip_get_line(info->chip, reg_wen_offset);
-    gpiod_line_request_output(info->reg_wen_line, "fpgav3init", 0);
-
-    info->blk_wstart_line = gpiod_chip_get_line(info->chip, blk_wstart_offset);
-    gpiod_line_request_output(info->blk_wstart_line, "fpgav3init", 0);
-
-    info->blk_wen_line = gpiod_chip_get_line(info->chip, blk_wen_offset);
-    gpiod_line_request_output(info->blk_wen_line, "fpgav3init", 0);
+    // Get a group of lines (bits) for ctrl (req_bus, reg_wen, blk_wstart, blk_wen)
+    if (gpiod_chip_get_lines(info->chip, ctrl_offsets, CTRL_MAX, &info->ctrl_lines) != 0) {
+        printf("Failed to get ctrl_lines\n");
+        gpiod_chip_close(info->chip);
+        return false;
+    }
+    // Set all lines to output, initialized to 0
+    gpiod_line_request_bulk_output(&info->ctrl_lines, "fpgav3init", ctrl_zero);
 
     return info;
 }
@@ -103,6 +127,7 @@ void EMIO_Release(struct EMIO_Info *info)
 {
     gpiod_line_release_bulk(&info->reg_data_lines);
     gpiod_line_release_bulk(&info->reg_addr_lines);
+    gpiod_line_release_bulk(&info->ctrl_lines);
     gpiod_chip_close(info->chip);
     free(info);
 }
@@ -157,14 +182,14 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     // Write reg_addr (read address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
     // Set req_bus to 1 (rising edge requests firmware to read register)
-    gpiod_line_set_value(info->req_bus_line, 1);
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_reqbus);
     // op_done should be set quickly by firmware, to indicate
     // that read has completed
     WaitOpDone(info, "read");
     // Read data from reg_data
     gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
     // Set req_bus to 0
-    gpiod_line_set_value(info->req_bus_line, 0);
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
     for (i = 0; i < 32; i++)
         *data = (*data<<1)|reg_rdata_values[i];
     return true;
@@ -200,16 +225,13 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     // Write reg_addr (write address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
 
-    // Set reg_wen to 1
-    gpiod_line_set_value(info->reg_wen_line, 1);
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_qwrite);
 
-    // Set req_bus to 1 (rising edge requests firmware to write register)
-    gpiod_line_set_value(info->req_bus_line, 1);
     // op_done should be set quickly by firmware, to indicate
     // that write has completed
     WaitOpDone(info, "write");
-    // Set req_bus to 0
-    gpiod_line_set_value(info->req_bus_line, 0);
+    // Set req_bus (and other ctrl lines) to 0
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
     return true;
 }
 
@@ -353,6 +375,7 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 {
     int reg_wdata_values[32];
     int reg_addr_values[16];
+    int ctrl_values[CTRL_MAX];
     unsigned int i, q;
 
     unsigned int nQuads = (nBytes+3)/4;
@@ -378,11 +401,12 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
         info->isInput = false;
     }
 
-    // Set blk_wstart to 1
-    gpiod_line_set_value(info->blk_wstart_line, 1);
-
-    // Set req_bus to 1
-    gpiod_line_set_value(info->req_bus_line, 1);
+    // Set blk_wstart and req_bus to 1
+    ctrl_values[CTRL_REQ_BUS] = 1;
+    ctrl_values[CTRL_REG_WEN] = 0;
+    ctrl_values[CTRL_BLK_WSTART] = 1;
+    ctrl_values[CTRL_BLK_WEN] = 0;
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
     // Unfortunately, we do not know when we get the bus.
     // For now, we just continue and hope for the best.
@@ -400,7 +424,8 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
         if (q == 0) {
             // Set blk_wstart to 0
-            gpiod_line_set_value(info->blk_wstart_line, 0);
+            ctrl_values[CTRL_BLK_WSTART] = 0;
+            gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
         }
 
         // Write reg_addr (write address)
@@ -410,34 +435,34 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
         gpiod_line_set_value_bulk(&info->reg_data_lines, reg_wdata_values);
 
         // Set reg_wen to 1
-        gpiod_line_set_value(info->reg_wen_line, 1);
+        ctrl_values[CTRL_REG_WEN] = 1;
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
         // op_done should be set quickly by firmware, to indicate
         // that write has completed
         WaitOpDone(info, "write");
         // Add a little delay
-        gpiod_line_set_value(info->reg_wen_line, 1);
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
         // Set reg_wen to 0
-        gpiod_line_set_value(info->reg_wen_line, 0);
+        ctrl_values[CTRL_REG_WEN] = 0;
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
     }
 
     // Should wait 60 ns; for now, just waste some time
     for (i = 0; i < 10; i++)
-        gpiod_line_set_value(info->reg_wen_line, 0);
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
     // Set blk_wen to 1
-    gpiod_line_set_value(info->blk_wen_line, 1);
+    ctrl_values[CTRL_BLK_WEN] = 1;
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
     // Wait 20 ns; for now, just waste some time
     for (i = 0; i < 3; i++)
-        gpiod_line_set_value(info->blk_wen_line, 1);
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
-    // Set blk_wen to 0
-    gpiod_line_set_value(info->blk_wen_line, 0);
-
-    // Set req_bus to 0
-    gpiod_line_set_value(info->req_bus_line, 0);
+    // Set all lines to 0
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
 
     return true;
 }
