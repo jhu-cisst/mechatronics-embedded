@@ -61,7 +61,7 @@ Note that the `fpgav3init` application compiled with the Linux kernel will autor
 
 ## Release Notes
 
-  * Rev 1.0.1 (November 26, 2023)
+  * Rev 1.0.1 (November 27, 2023)
     * Create toolchain files to cross-compile with Vitis or clang
     * Support use of sysroot from GitHub release
     * Added EMIO_GetVerbose and EMIO_SetVerbose methods
