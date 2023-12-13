@@ -23,6 +23,7 @@ struct EMIO_Info {
     struct gpiod_line_bulk reg_data_lines;
     struct gpiod_line_bulk reg_addr_lines;
     struct gpiod_line      *op_done_line;
+    struct gpiod_line      *bus_grant_line;
     struct gpiod_line_bulk ctrl_lines;
     bool isInput;   // true if data lines are input
     bool isVerbose; // true if error messages should be printed
@@ -37,6 +38,7 @@ struct EMIO_Info *EMIO_Init()
     unsigned int reg_wen_offset;
     unsigned int blk_wstart_offset;
     unsigned int blk_wen_offset;
+    unsigned int bus_grant_offset;
     unsigned int ctrl_offsets[CTRL_MAX];
     int reg_addr_values[16];
 
@@ -73,6 +75,7 @@ struct EMIO_Info *EMIO_Init()
     reg_wen_offset = INDEX_EMIO_START+50;
     blk_wstart_offset = INDEX_EMIO_START+51;
     blk_wen_offset = INDEX_EMIO_START+52;
+    bus_grant_offset = INDEX_EMIO_START+54;
 
     // Ctrl offsets
     ctrl_offsets[CTRL_REQ_BUS] = req_bus_offset;
@@ -109,7 +112,10 @@ struct EMIO_Info *EMIO_Init()
     gpiod_line_request_bulk_output(&info->reg_addr_lines, "fpgav3init", reg_addr_values);
 
     info->op_done_line = gpiod_chip_get_line(info->chip, op_done_offset);
-    gpiod_line_request_input(info->op_done_line, "fpgav3init");
+    gpiod_line_request_rising_edge_events(info->op_done_line, "fpgav3init");
+
+    info->bus_grant_line = gpiod_chip_get_line(info->chip, bus_grant_offset);
+    gpiod_line_request_rising_edge_events(info->bus_grant_line, "fpgav3init");
 
     // Get a group of lines (bits) for ctrl (req_bus, reg_wen, blk_wstart, blk_wen)
     if (gpiod_chip_get_lines(info->chip, ctrl_offsets, CTRL_MAX, &info->ctrl_lines) != 0) {
@@ -142,21 +148,20 @@ void EMIO_SetVerbose(struct EMIO_Info *info, bool newState)
     info->isVerbose = newState;
 }
 
-// Local method to wait for op_done line to be set
-static void WaitOpDone(struct EMIO_Info *info, const char *opType)
+// Local method to wait for event on specified line
+static bool WaitEvent(struct gpiod_line *line, bool isVerbose, const char *opType)
 {
-    if (gpiod_line_get_value(info->op_done_line) != 1) {
-        // Should set a timeout for following while loop
-        if (info->isVerbose) {
-            printf("Waiting to %s", opType);
-            while (gpiod_line_get_value(info->op_done_line) != 1)
-                printf(".");
-            printf("\n");
-        }
-        else {
-            while (gpiod_line_get_value(info->op_done_line) != 1);
-        }
+    struct timespec timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_nsec = 5000;
+    int rc = gpiod_line_event_wait(line, &timeout);
+    if (isVerbose) {
+        if (rc == 0)
+            printf("EMIO timeout waiting for %s\n", opType);
+        else if (rc == -1)
+            printf("EMIO error waiting for %s\n", opType);
     }
+    return (rc == 1);
 }
 
 // EMIO_ReadQuadlet: read quadlet from specified address
@@ -185,7 +190,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_reqbus);
     // op_done should be set quickly by firmware, to indicate
     // that read has completed
-    WaitOpDone(info, "read");
+    WaitEvent(info->op_done_line, info->isVerbose, "read done");
     // Read data from reg_data
     gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
     // Set req_bus to 0
@@ -229,7 +234,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
 
     // op_done should be set quickly by firmware, to indicate
     // that write has completed
-    WaitOpDone(info, "write");
+    WaitEvent(info->op_done_line, info->isVerbose, "write done");
     // Set req_bus (and other ctrl lines) to 0
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
     return true;
@@ -408,10 +413,7 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
     ctrl_values[CTRL_BLK_WEN] = 0;
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 
-    // Unfortunately, we do not know when we get the bus.
-    // For now, we just continue and hope for the best.
-    // Note that we clear blk_wstart in the loop below,
-    // with the hope that it has been asserted long enough.
+    WaitEvent(info->bus_grant_line, info->isVerbose, "write bus");
 
     for (unsigned int q = 0; q < nQuads; q++) {
 
@@ -440,7 +442,7 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
         // op_done should be set quickly by firmware, to indicate
         // that write has completed
-        WaitOpDone(info, "write");
+        WaitEvent(info->op_done_line, info->isVerbose, "write done");
         // Add a little delay
         gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
 

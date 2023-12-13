@@ -351,6 +351,7 @@ int main(int argc, char **argv)
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers
+    printf("Writing FPGA S/N to FPGA\n\n");
     CopyQspiToFpga("/dev/mtd4ro", emio, 16);
 
     EMIO_Release(emio);

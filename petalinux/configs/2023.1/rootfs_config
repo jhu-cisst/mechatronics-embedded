@@ -3839,6 +3839,7 @@ CONFIG_Init-manager-sysvinit=y
 # user packages 
 #
 CONFIG_libfpgav3=y
+CONFIG_fpgav3block=y
 CONFIG_fpgav3init=y
 CONFIG_fpgav3sn=y
 CONFIG_gpio-demo=y
