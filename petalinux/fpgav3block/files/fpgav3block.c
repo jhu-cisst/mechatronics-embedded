@@ -39,7 +39,7 @@ int main(int argc, char **argv)
         }
         else {
             if (args_found == 0)
-                addr = strtoull(argv[i], 0, 16);
+                addr = strtoul(argv[i], 0, 16);
             else if ((args_found == 1) && (isQuad))
                 data1 = strtoul(argv[i], 0, 16);
             else if ((args_found == 1) && (!isQuad)) {
