@@ -34,9 +34,23 @@ struct EMIO_Info *EMIO_Init();
 // Release the resources allocated by EMIO_Init
 void EMIO_Release(struct EMIO_Info *info);
 
+// Get bus interface version number
+unsigned int EMIO_GetVersion(struct EMIO_Info *info);
+
 // Get/Set verbose flag (true -> prints messages when waiting for FPGA I/O to complete)
 bool EMIO_GetVerbose(struct EMIO_Info *info);
 void EMIO_SetVerbose(struct EMIO_Info *info, bool newState);
+
+// Get/Set timing mode (true -> measure timing info)
+//   0 --> no timing
+//   1 --> only total time
+//   2 --> total and intermediate times
+unsigned int EMIO_GetTimingMode(struct EMIO_Info *info);
+void EMIO_SetTimingMode(struct EMIO_Info *info, unsigned int newMode);
+
+// Get/Set event flag (true -> use events instead of polling)
+bool EMIO_GetEventMode(struct EMIO_Info *info);
+void EMIO_SetEventMode(struct EMIO_Info *info, bool newState);
 
 // EMIO_ReadQuadlet
 //   Reads a quadlet (32-bit register) from the FPGA.
@@ -102,11 +116,26 @@ public:
     ~EMIO_Interface()
     { EMIO_Release(info); }
 
-    bool GetVerbose()
+    unsigned int GetVersion() const
+    { return EMIO_GetVersion(info); }
+
+    bool GetVerbose() const
     { return EMIO_GetVerbose(info); }
 
     void SetVerbose(bool newState)
     { EMIO_SetVerbose(info, newState); }
+
+    unsigned int GetTimingMode() const
+    { return EMIO_GetTimingMode(info); }
+
+    void SetTimingMode(unsigned int newState)
+    { EMIO_SetTimingMode(info, newState); }
+
+    bool GetEventMode() const
+    { return EMIO_GetEventMode(info); }
+
+    void SetEventMode(bool newState)
+    { EMIO_SetEventMode(info, newState); }
 
     bool ReadQuadlet(uint16_t addr, uint32_t &data)
     { return EMIO_ReadQuadlet(info, addr, &data); }
