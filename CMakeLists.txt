@@ -236,8 +236,10 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
   file (APPEND ${TOOLCHAIN_FILE} "# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake"
                                  "  <path-to-source>\n\n")
   file (APPEND ${TOOLCHAIN_FILE} "set (Sysroot ${PETALINUX_SYSROOT})\n")
-  file (APPEND ${TOOLCHAIN_FILE} "set (VITIS_ROOT ${VITIS_ROOT})\n")
-  file (APPEND ${TOOLCHAIN_FILE} "\n# Following is patched version from Xilinx repository\n\n")
+  file (APPEND ${TOOLCHAIN_FILE} "set (VITIS_ROOT ${VITIS_ROOT})\n\n")
+  file (APPEND ${TOOLCHAIN_FILE} "# Disable annoying linker warning about parameter passing change in GCC 7.1\n")
+  file (APPEND ${TOOLCHAIN_FILE} "SET (CMAKE_CXX_FLAGS \"\${CMAKE_CXX_FLAGS} -Wno-psabi\")\n\n")
+  file (APPEND ${TOOLCHAIN_FILE} "# Following is patched version from Xilinx repository\n\n")
 
   # Fetch the Xilinx CMake modules
   include (FetchContent)
