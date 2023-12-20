@@ -22,6 +22,9 @@
 extern "C" {
 #endif
 
+// Return GPIOD library version string
+const char *EMIO_gpiod_version_string();
+
 // Forward declaration
 struct EMIO_Info;
 

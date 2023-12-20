@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 
     bool isQuad = (strstr(argv[0], "fpgav3quad") != 0);
     bool isVerbose = false;
-    bool useEvents = false;
+    unsigned int eventMode = 2;
     unsigned int timingMode = 0;
 
     j = 0;
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
                 if (argv[i][2]) timingMode = argv[i][2]-'0';
             }
             else if (argv[i][1] == 'e') {
-                useEvents = true;
+                if (argv[i][2]) eventMode = argv[i][2]-'0';
             }
         }
         else {
@@ -70,12 +70,12 @@ int main(int argc, char **argv)
 
     if (args_found < 1) {
         if (isQuad)
-            printf("Usage: %s [-v] [-t<n>] [-e]  <address in hex> [value to write in hex]\n", argv[0]);
+            printf("Usage: %s [-v] [-e<n>] [-t<n>] <address in hex> [value to write in hex]\n", argv[0]);
         else
             printf("Usage: %s [-v]  <address in hex> <number of quadlets> [write data quadlets in hex]\n", argv[0]);
         printf("       where -v is for verbose output\n");
-        printf("             -e is to use events instead of polling\n");
-        printf("             -tn is for timing measurement, n = 0 (no timing), 1 (total time only), 2+ (all timing)\n");
+        printf("             -e<n> is to use polling (0) or events (1)\n");
+        printf("             -t<n> is for timing measurement: 0 (no timing), 1 (total time only), 2+ (all timing)\n");
         return 0;
     }
 
@@ -86,11 +86,29 @@ int main(int argc, char **argv)
     }
 
     EMIO_SetVerbose(info, isVerbose);
-    EMIO_SetEventMode(info, useEvents);
+
+    bool defaultEventMode = true;
+    if (eventMode == 0) {
+        EMIO_SetEventMode(info, false);
+        defaultEventMode = false;
+    }
+    else if (eventMode == 1) {
+        EMIO_SetEventMode(info, true);
+        defaultEventMode = false;
+    }
+
     EMIO_SetTimingMode(info, timingMode);
 
-    if (isVerbose)
+    if (isVerbose) {
+        printf("GPIOD library version %s\n", EMIO_gpiod_version_string());
         printf("EMIO bus interface version %d\n", EMIO_GetVersion(info));
+        if (EMIO_GetEventMode(info))
+            printf("Configured to use events");
+        else
+            printf("Configured to use polling");
+        if (defaultEventMode) printf(" (default)");
+        printf("\n");
+    }
 
     // Determine whether to read or write based on args_found
     if ((isQuad && (args_found == 1)) ||

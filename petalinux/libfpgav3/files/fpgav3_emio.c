@@ -17,11 +17,19 @@ typedef struct timespec fpgav3_time_t;
 const unsigned int INDEX_EMIO_START = 54;
 const unsigned int INDEX_EMIO_END = 118;
 
-enum { CTRL_REQ_BUS, CTRL_REG_WEN, CTRL_BLK_WSTART, CTRL_BLK_WEN, CTRL_MAX };
+// Initially, had CTRL_REQ_BUS as first enum value, but it did not work;
+// perhaps the GPIO lines must be sequential, at least in libgpiod 1.6.3.
+// Thus, moved CTRL_REQ_BUS to a separate line (req_bus_line).
+enum { CTRL_REG_WEN=0, CTRL_BLK_START, CTRL_BLK_END, CTRL_MAX };
 
-unsigned int ctrl_zero[CTRL_MAX];    // all 0
-unsigned int ctrl_qwrite[CTRL_MAX];  // quadlet write (req_bus, reg_wen, blk_wen)
-unsigned int ctrl_reqbus[CTRL_MAX];  // req_bus
+int ctrl_zero[CTRL_MAX];    // all 0
+int ctrl_qwrite[CTRL_MAX];  // quadlet write (reg_wen, blk_end)
+
+// Return GPIOD library version string
+const char *EMIO_gpiod_version_string()
+{
+    return gpiod_version_string();
+}
 
 // GPIO (EMIO) access to FPGA registers
 
@@ -31,12 +39,15 @@ struct EMIO_Info {
     struct gpiod_line_bulk reg_addr_lines;
     struct gpiod_line      *op_done_line;
     struct gpiod_line      *bus_grant_line;
+    struct gpiod_line      *req_bus_line;
     struct gpiod_line_bulk ctrl_lines;
     bool isInput;              // true if data lines are input
     bool isVerbose;            // true if error messages should be printed
     bool useEvents;            // true if using events to wait
     unsigned int doTiming;     // timing mode (0, 1 or 2)
     unsigned int version;      // Version from FPGA
+    fpgav3_time_t startTime;   // Start time for measurement
+    fpgav3_time_t endTime;     // End time for measurement
 };
 
 struct EMIO_Info *EMIO_Init()
@@ -47,12 +58,12 @@ struct EMIO_Info *EMIO_Init()
     unsigned int req_bus_offset;
     unsigned int op_done_offset;
     unsigned int reg_wen_offset;
-    unsigned int blk_wstart_offset;
-    unsigned int blk_wen_offset;
+    unsigned int blk_start_offset;
+    unsigned int blk_end_offset;
     unsigned int bus_grant_offset;
     unsigned int ctrl_offsets[CTRL_MAX];
-    unsigned int version_values[4];
-    unsigned int reg_addr_values[16];
+    int version_values[4];
+    int reg_addr_values[16];
     size_t i;
 
     struct EMIO_Info *info;
@@ -71,31 +82,26 @@ struct EMIO_Info *EMIO_Init()
     for (i = 0; i < CTRL_MAX; i++) {
         ctrl_zero[i] = 0;
         ctrl_qwrite[i] = 0;
-        ctrl_reqbus[i] = 0;
     }
 
-    // For quadlet write, set reg_wen, blk_wen and req_bus to 1
+    // For quadlet write, set reg_wen, blk_end and req_bus to 1
     // Rising edge of req_bus requests firmware to write register; note that this
     // can be set at the same time as the other signals because it is delayed in
     // the firmware.
-    ctrl_qwrite[CTRL_REQ_BUS] = 1;
-    ctrl_qwrite[CTRL_REG_WEN] = 1;   // no longer used
-    ctrl_qwrite[CTRL_BLK_WEN] = 1;
-
-    ctrl_reqbus[CTRL_REQ_BUS] = 1;
+    ctrl_qwrite[CTRL_REG_WEN] = 1;   // no longer used (version 1)
+    ctrl_qwrite[CTRL_BLK_END] = 1;   // no longer used for quadlet write (version 1)
 
     req_bus_offset = INDEX_EMIO_START+48;
     op_done_offset = INDEX_EMIO_START+49;
     reg_wen_offset = INDEX_EMIO_START+50;
-    blk_wstart_offset = INDEX_EMIO_START+51;
-    blk_wen_offset = INDEX_EMIO_START+52;
+    blk_start_offset = INDEX_EMIO_START+51;
+    blk_end_offset = INDEX_EMIO_START+52;
     bus_grant_offset = INDEX_EMIO_START+54;
 
     // Ctrl offsets
-    ctrl_offsets[CTRL_REQ_BUS] = req_bus_offset;
     ctrl_offsets[CTRL_REG_WEN] = reg_wen_offset;
-    ctrl_offsets[CTRL_BLK_WSTART] = blk_wstart_offset;
-    ctrl_offsets[CTRL_BLK_WEN] = blk_wen_offset;
+    ctrl_offsets[CTRL_BLK_START] = blk_start_offset;
+    ctrl_offsets[CTRL_BLK_END] = blk_end_offset;
 
     // First, open the chip
     info->chip = gpiod_chip_open("/dev/gpiochip0");
@@ -123,7 +129,7 @@ struct EMIO_Info *EMIO_Init()
     gpiod_line_release_bulk(&version_lines);
 
     if (info->version > 1) {
-        printf("EMIO bus interface verion %d not supported\n", info->version);
+        printf("EMIO bus interface verion %u not supported\n", info->version);
         gpiod_chip_close(info->chip);
         return 0;
     }
@@ -147,14 +153,19 @@ struct EMIO_Info *EMIO_Init()
     // Set all lines to output, initialized to 0
     gpiod_line_request_bulk_output(&info->reg_addr_lines, "libfpgav3", reg_addr_values);
 
-    // Get op_done line, addition settings in SetEventMode
+    // Get op_done line, additional settings in SetEventMode
     info->op_done_line = gpiod_chip_get_line(info->chip, op_done_offset);
 
     // Following only available in version 1+, and is not currently used anyway
     info->bus_grant_line = gpiod_chip_get_line(info->chip, bus_grant_offset);
     gpiod_line_request_rising_edge_events(info->bus_grant_line, "libfpgav3");
 
-    // Get a group of lines (bits) for ctrl (req_bus, reg_wen, blk_wstart, blk_wen)
+    // Get req_bus line (previously was included in ctrl_lines)
+    info->req_bus_line = gpiod_chip_get_line(info->chip, req_bus_offset);
+    gpiod_line_request_output(info->req_bus_line, "libfpgav3", 0);
+
+    // Get a group of lines (bits) for ctrl (reg_wen, blk_start, blk_end)
+    // Previously included req_bus, but that did not work
     if (gpiod_chip_get_lines(info->chip, ctrl_offsets, CTRL_MAX, &info->ctrl_lines) != 0) {
         printf("Failed to get ctrl_lines\n");
         gpiod_chip_close(info->chip);
@@ -165,7 +176,7 @@ struct EMIO_Info *EMIO_Init()
 
     // Set defaults values of flags
     EMIO_SetVerbose(info, false);
-    EMIO_SetEventMode(info, false);
+    EMIO_SetEventMode(info, true);
     EMIO_SetTimingMode(info, 0);
 
     return info;
@@ -249,29 +260,44 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType)
     bool ret;
     if (info->useEvents) {
         struct timespec timeout;
+        struct gpiod_line_event event;
         timeout.tv_sec = 0;
-        timeout.tv_nsec = 5000;
+        timeout.tv_nsec = 250000;  // 250 us
         int rc = gpiod_line_event_wait(info->op_done_line, &timeout);
         if (info->isVerbose) {
             if (rc == 0)
-                printf("EMIO timeout waiting for %s\n", opType);
-            else if (rc == -1)
-                printf("EMIO error waiting for %s\n", opType);
+                printf("EMIO event timeout waiting for %s\n", opType);
+            else if (rc < 0)
+                printf("EMIO event error waiting for %s (rc = %d)\n", opType, rc);
+        }
+        if (rc == 1) {
+            // If successful, read event
+            gpiod_line_event_read(info->op_done_line, &event);
+            if (info->isVerbose) {
+#ifdef USE_TIMEOFDAY
+                if (0)
+#else
+                if (info->doTiming > 0)
+#endif
+                    printf("Event occurred at %lf us\n", TimeDiff_us(&info->startTime, &event.ts));
+                else
+                    printf("Event occurred at %ld s, %ld ns\n", event.ts.tv_sec, event.ts.tv_nsec);
+            }
         }
         ret = (rc == 1);
     }
     else {
         int i;
-        for (i = 0; i < 10; i++) {
+        for (i = 0; i < 100; i++) {
             if (gpiod_line_get_value(info->op_done_line) == 1) break;
         }
         if (info->isVerbose) {
-            if (i == 10)
-                printf("EMIO timeout waiting for %s\n", opType);
+            if (i == 100)
+                printf("EMIO poll timeout waiting for %s\n", opType);
             else if (i > 0)
-                printf("EMIO waited %d loops fo %s\n", i, opType);
+                printf("EMIO poll waited %d loops for %s\n", i, opType);
         }
-        ret = (i < 10);
+        ret = (i < 100);
     }
     return ret;
 }
@@ -284,10 +310,8 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     size_t i;
 
     // For timing measurements
-    fpgav3_time_t startTime;
     fpgav3_time_t beforeWait;
     fpgav3_time_t afterWait;
-    fpgav3_time_t endTime;
 
     if (!info) {
         printf("EMIO_ReadQuadlet: null pointer\n");
@@ -296,7 +320,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
 
     // Get start time for measurement
     if (info->doTiming > 0)
-        GetCurTime(&startTime);
+        GetCurTime(&info->startTime);
 
     for (i = 0; i < 16; i++)
         reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
@@ -313,16 +337,19 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
 
     // Write reg_addr (read address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+    // Set ctrl_lines to 0
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
     // Set req_bus to 1 (rising edge requests firmware to read register)
-    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_reqbus);
-    // op_done should be set quickly by firmware, to indicate
-    // that read has completed
+    gpiod_line_set_value(info->req_bus_line, 1);
 
     // Get time before wait
     if (info->doTiming > 1)
         GetCurTime(&beforeWait);
 
-    WaitOpDone(info, "read done");
+    if (!WaitOpDone(info, "read done")) {
+        gpiod_line_set_value(info->req_bus_line, 0);
+        return false;
+    }
 
     // Get time after wait
     if (info->doTiming > 1)
@@ -331,18 +358,18 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
     // Read data from reg_data
     gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
     // Set req_bus to 0
-    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+    gpiod_line_set_value(info->req_bus_line, 0);
     *data = 0;
     for (i = 0; i < 32; i++)
         *data = (*data<<1)|reg_rdata_values[i];
 
     // Get end time
     if (info->doTiming > 0) {
-        GetCurTime(&endTime);
-        printf("ReadQuadlet total time = %lf us\n", TimeDiff_us(&startTime, &endTime));
+        GetCurTime(&info->endTime);
+        printf("ReadQuadlet total time = %lf us\n", TimeDiff_us(&info->startTime, &info->endTime));
         if (info->doTiming > 1) {
-            printf("Start-wait-end times = %lf, %lf, %lf us\n", TimeDiff_us(&startTime, &beforeWait),
-                   TimeDiff_us(&beforeWait, &afterWait), TimeDiff_us(&afterWait, &endTime));
+            printf("Start-wait-end times = %lf, %lf, %lf us\n", TimeDiff_us(&info->startTime, &beforeWait),
+                   TimeDiff_us(&beforeWait, &afterWait), TimeDiff_us(&afterWait, &info->endTime));
         }
     }
 
@@ -357,10 +384,8 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     size_t i;
 
     // For timing measurements
-    fpgav3_time_t startTime;
     fpgav3_time_t beforeWait;
     fpgav3_time_t afterWait;
-    fpgav3_time_t endTime;
 
     if (!info) {
         printf("EMIO_WriteQuadlet: null pointer\n");
@@ -369,7 +394,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
 
     // Get start time for measurement
     if (info->doTiming > 0)
-        GetCurTime(&startTime);
+        GetCurTime(&info->startTime);
 
     for (i = 0; i < 16; i++)
         reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
@@ -394,7 +419,10 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
     // Write reg_addr (write address)
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
 
+    // Set ctrl_lines for quadlet write
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_qwrite);
+    // Set req_bus to 1 (rising edge requests firmware to write register)
+    gpiod_line_set_value(info->req_bus_line, 1);
 
     // Get time before wait
     if (info->doTiming > 1)
@@ -402,26 +430,27 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
 
     // op_done should be set quickly by firmware, to indicate
     // that write has completed
-    WaitOpDone(info, "write done");
+    bool ret = WaitOpDone(info, "write done");
 
     // Get time after wait
-    if (info->doTiming > 1)
+    if (ret && info->doTiming > 1)
         GetCurTime(&afterWait);
 
     // Set req_bus (and other ctrl lines) to 0
+    gpiod_line_set_value(info->req_bus_line, 0);
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
 
     // Get end time
-    if (info->doTiming > 0) {
-        GetCurTime(&endTime);
-        printf("WriteQuadlet total time = %lf us\n", TimeDiff_us(&startTime, &endTime));
+    if (ret && (info->doTiming > 0)) {
+        GetCurTime(&info->endTime);
+        printf("WriteQuadlet total time = %lf us\n", TimeDiff_us(&info->startTime, &info->endTime));
         if (info->doTiming > 1) {
-            printf("Start-wait-end times = %lf, %lf, %lf us\n", TimeDiff_us(&startTime, &beforeWait),
-                   TimeDiff_us(&beforeWait, &afterWait), TimeDiff_us(&afterWait, &endTime));
+            printf("Start-wait-end times = %lf, %lf, %lf us\n", TimeDiff_us(&info->startTime, &beforeWait),
+                   TimeDiff_us(&beforeWait, &afterWait), TimeDiff_us(&afterWait, &info->endTime));
         }
     }
 
-    return true;
+    return ret;
 }
 
 // Real-time block read
@@ -490,27 +519,131 @@ static bool EMIO_ReadBlockRt(struct EMIO_Info *info, uint32_t *data, unsigned in
 //
 bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes)
 {
-    unsigned int i;
+    unsigned int i, q;
     unsigned int nQuads = (nBytes+3)/4;
+    int reg_rdata_values[32];
+    int reg_addr_values[16];
+    int ctrl_values[CTRL_MAX];
+    uint32_t val;
+
+    // For timing measurements
+    fpgav3_time_t firstRead;
+    fpgav3_time_t lastRead;
 
     if (!info) {
         printf("EMIO_ReadBlock: null pointer\n");
         return false;
     }
 
-    if (addr == 0) {
-        // Real-time block read
-        return EMIO_ReadBlockRt(info, data, nQuads);
+    if (info->version == 0) {
+        // Local startTime and endTime because ReadQuadlet will overwrite info struct
+        fpgav3_time_t startTime;
+        fpgav3_time_t endTime;
+
+        if (info->doTiming > 0)
+            GetCurTime(&startTime);
+
+        bool ret;
+        if (addr == 0) {
+            ret = EMIO_ReadBlockRt(info, data, nQuads);
+        }
+        else {
+            ret = true;
+            for (i = 0; i < nQuads; i++) {
+                if (EMIO_ReadQuadlet(info, addr+i, &val)) {
+                    data[i] = bswap_32(val);
+                }
+                else {
+                    ret = false;
+                    break;
+                }
+            }
+        }
+        if (ret && (info->doTiming > 0)) {
+            GetCurTime(&endTime);
+            printf("ReadBlock (version 0) total time = %lf us\n", TimeDiff_us(&startTime, &endTime));
+        }
+        return ret;
     }
-    else {
-        // Regular block read
-        uint32_t val;
-        for (i = 0; i < nQuads; i++) {
-            if (!EMIO_ReadQuadlet(info, addr+i, &val))
-                return false;
-            data[i] = bswap_32(val);
+
+    // Get start time for measurement
+    if (info->doTiming > 0)
+        GetCurTime(&info->startTime);
+
+    // Set all data lines to input
+    if (!info->isInput) {
+        gpiod_line_release_bulk(&info->reg_data_lines);
+        if (gpiod_line_request_bulk_input(&info->reg_data_lines, "libfpgav3") != 0) {
+            printf("EMIO_ReadBlock: could not set data lines as input\n");
+            return false;
+        }
+        info->isInput = true;
+    }
+
+    // Set blk_start to 1
+    ctrl_values[CTRL_REG_WEN] = 0;
+    ctrl_values[CTRL_BLK_START] = 1;
+    ctrl_values[CTRL_BLK_END] = 0;
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
+
+    for (q = 0; q < nQuads; q++) {
+
+        for (i = 0; i < 16; i++)
+            reg_addr_values[i] = ((addr+q)&(0x8000>>i)) ? 1 : 0;
+
+        if (q == 0) {
+            // Write reg_addr (read address)
+            gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+            // Set req_bus
+            gpiod_line_set_value(info->req_bus_line, 1);
+            if (info->doTiming > 1)
+                GetCurTime(&firstRead);
+        }
+        else {
+            if (q == nQuads-1) {
+                // Set blk_end to 1 to indicate end of block write
+                ctrl_values[CTRL_BLK_START] = 0;
+                ctrl_values[CTRL_BLK_END] = 1;
+                gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
+            }
+            // Write reg_addr (read address) last because address change
+            // will trigger read
+            gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+        }
+
+        // op_done set by firmware, to indicate that quadlet
+        // has been read
+        if (!WaitOpDone(info, "read done")) {
+            gpiod_line_set_value(info->req_bus_line, 0);
+            gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+            return false;
+        }
+
+        // Read data from reg_data
+        gpiod_line_get_value_bulk(&info->reg_data_lines, reg_rdata_values);
+        val = 0;
+        for (i = 0; i < 32; i++)
+            val = (val<<1)|reg_rdata_values[i];
+        data[q] = bswap_32(val);
+    }
+
+    if (info->doTiming > 1)
+        GetCurTime(&lastRead);
+
+    // Set all lines to 0
+    gpiod_line_set_value(info->req_bus_line, 0);
+    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+
+    // Get end time
+    if (info->doTiming > 0) {
+        GetCurTime(&info->endTime);
+        printf("ReadBlock total time = %lf us\n", TimeDiff_us(&info->startTime, &info->endTime));
+        if (info->doTiming > 1) {
+            printf("Start-loop-end times = %lf, %lf, %lf us\n", TimeDiff_us(&info->startTime, &firstRead),
+                   TimeDiff_us(&firstRead, &lastRead), TimeDiff_us(&lastRead, &info->endTime));
         }
     }
+
     return true;
 }
 
@@ -555,6 +688,7 @@ static bool EMIO_WriteBlockRt(struct EMIO_Info *info, uint32_t *data, unsigned i
     uint32_t ctrl = bswap_32(data[nQuads-1]);
     if (noDacWrite || ((ctrl&0x000fffff) != 0))
         ret = EMIO_WriteQuadlet(info, 0, ctrl);
+
     return ret;
 }
 
@@ -568,19 +702,13 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
     unsigned int i, q;
 
     // For timing measurements
-    fpgav3_time_t startTime;
     fpgav3_time_t firstWrite;
     fpgav3_time_t lastWrite;
-    fpgav3_time_t endTime;
 
     if (!info) {
         printf("EMIO_WriteBlock: null pointer\n");
         return false;
     }
-
-    // Get start time for measurement
-    if (info->doTiming > 0)
-        GetCurTime(&startTime);
 
     unsigned int nQuads = (nBytes+3)/4;
 
@@ -588,13 +716,29 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
         bool ret = false;
         if (addr == 0) {
             // Special case for real-time block write
+            // Local startTime and endTime because WriteQuadlet will overwrite info struct
+            fpgav3_time_t startTime;
+            fpgav3_time_t endTime;
+            if (info->doTiming > 0)
+                GetCurTime(&startTime);
+
             ret = EMIO_WriteBlockRt(info, data, nQuads);
+
+            if (info->doTiming > 0) {
+                GetCurTime(&endTime);
+                printf("WriteBlock (version 0) total time = %lf us\n", TimeDiff_us(&startTime, &endTime));
+            }
+
         }
         else if (info->isVerbose) {
             printf("EMIO_WriteBlock: only real-time block write supported for Version 0\n");
         }
         return ret;
     }
+
+    // Get start time for measurement
+    if (info->doTiming > 0)
+        GetCurTime(&info->startTime);
 
     uint32_t val = bswap_32(data[0]);
     for (i = 0; i < 32; i++)
@@ -615,27 +759,25 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
         reg_addr_values[i] = (addr&(0x8000>>i)) ? 1 : 0;
     gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
 
-    // Set blk_wstart and req_bus to 1 (reg_wen no longer used)
-    ctrl_values[CTRL_REQ_BUS] = 1;
+    // Set blk_start and req_bus to 1 (reg_wen no longer used)
     ctrl_values[CTRL_REG_WEN] = 0;
-    ctrl_values[CTRL_BLK_WSTART] = 1;
-    ctrl_values[CTRL_BLK_WEN] = 0;
+    ctrl_values[CTRL_BLK_START] = 1;
+    ctrl_values[CTRL_BLK_END] = 0;
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
+    gpiod_line_set_value(info->req_bus_line, 1);
 
-    // op_done set by firmware, to indicate that blk_wstart has been
+    // op_done set by firmware, to indicate that blk_start has been
     // generated and first quadlet has been written
-    WaitOpDone(info, "first write done");
+    if (!WaitOpDone(info, "first write done")) {
+        gpiod_line_set_value(info->req_bus_line, 0);
+        gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+        return false;
+    }
 
     if (info->doTiming > 1)
         GetCurTime(&firstWrite);
 
-#if 0
-    // Set blk_wstart to 0 (not needed, but doesn't hurt)
-    ctrl_values[CTRL_BLK_WSTART] = 0;
-    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
-#endif
-
-    for (unsigned int q = 1; q < nQuads; q++) {
+    for (q = 1; q < nQuads; q++) {
 
         for (i = 0; i < 16; i++)
             reg_addr_values[i] = ((addr+q)&(0x8000>>i)) ? 1 : 0;
@@ -647,35 +789,40 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
         // Write reg_data
         gpiod_line_set_value_bulk(&info->reg_data_lines, reg_wdata_values);
 
+        if (q == nQuads-1) {
+            // Set blk_end to 1 to indicate end of block write
+            ctrl_values[CTRL_BLK_START] = 0;
+            ctrl_values[CTRL_BLK_END] = 1;
+            gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
+        }
+
         // Write reg_addr (write address) last because address change
         // will trigger actual write
         gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
 
         // op_done set by firmware, to indicate that quadlet
         // has been written
-        WaitOpDone(info, "write done");
+        if (!WaitOpDone(info, "write done")) {
+            gpiod_line_set_value(info->req_bus_line, 0);
+            gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+            return false;
+        }
     }
 
     if (info->doTiming > 1)
         GetCurTime(&lastWrite);
 
-    // Set blk_wen to 1 to indicate end of block write
-    ctrl_values[CTRL_BLK_WEN] = 1;
-    gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
-
-    // op_done set by firmware, to indicate that blk_wen was generated
-    WaitOpDone(info, "last write done");
-
     // Set all lines to 0
+    gpiod_line_set_value(info->req_bus_line, 0);
     gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
 
     // Get end time
     if (info->doTiming > 0) {
-        GetCurTime(&endTime);
-        printf("WriteBlock total time = %lf us\n", TimeDiff_us(&startTime, &endTime));
+        GetCurTime(&info->endTime);
+        printf("WriteBlock total time = %lf us\n", TimeDiff_us(&info->startTime, &info->endTime));
         if (info->doTiming > 1) {
-            printf("Start-loop-end times = %lf, %lf, %lf us\n", TimeDiff_us(&startTime, &firstWrite),
-                   TimeDiff_us(&firstWrite, &lastWrite), TimeDiff_us(&lastWrite, &endTime));
+            printf("Start-loop-end times = %lf, %lf, %lf us\n", TimeDiff_us(&info->startTime, &firstWrite),
+                   TimeDiff_us(&firstWrite, &lastWrite), TimeDiff_us(&lastWrite, &info->endTime));
         }
     }
 
