@@ -52,6 +52,15 @@ if (USE_PETALINUX_SYSROOT AND NOT BUILD_PETALINUX_SYSROOT)
     set (PETALINUX_SYSROOT_EXTERNAL
          "https://github.com/jhu-cisst/mechatronics-embedded/releases/latest/download/fpgav3-sysroot-cortexa9.zip"
          CACHE STRING "URL or path to external sysroot (from Petalinux)")
+
+    if (IS_DIRECTORY ${PETALINUX_SYSROOT_EXTERNAL})
+      # The SYSROOT built by Petalinux does not have read permissions on /usr/bin/sudo, which will
+      # cause downstream failures. It is better to use the ZIP file, either from the GitHub Releases,
+      # or built locally using Petalinux -- see fpgav3-sysroot-cortexa9.zip in fpgav3-generated directory.
+      message (WARNING "SYSROOT directory specified - could fail due to permissions on /usr/bin/sudo -"
+                       " recommend using ZIP file on GitHub or in fpgav3-generated directory")
+    endif ()
+
     include (ExternalProject)
     ExternalProject_Add (sysroot_external
                          URL ${PETALINUX_SYSROOT_EXTERNAL}
@@ -60,6 +69,7 @@ if (USE_PETALINUX_SYSROOT AND NOT BUILD_PETALINUX_SYSROOT)
                          INSTALL_COMMAND "")
     ExternalProject_Get_property(sysroot_external SOURCE_DIR)
     set (PETALINUX_SYSROOT ${SOURCE_DIR})
+
 endif ()
 
 if (USE_VIVADO OR USE_VITIS OR USE_PETALINUX)
@@ -85,6 +95,7 @@ if (USE_VITIS OR USE_PETALINUX)
   if (mechatronics-firmware_FOUND)
 
     set (BIT_FILE ${FPGAV3_BCFG_BIT_FILE})
+    unset (BIT_FILE_MANUAL CACHE)
 
   else ()
 
