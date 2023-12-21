@@ -57,6 +57,7 @@ struct EMIO_Info {
     struct gpiod_chip *chip;
     struct gpiod_line_bulk reg_data_lines;
     struct gpiod_line_bulk reg_addr_lines;
+    struct gpiod_line      *reg_addr_lsb_line;
     struct gpiod_line      *op_done_line;
     struct gpiod_line      *bus_grant_line;
     struct gpiod_line      *req_bus_line;
@@ -185,6 +186,8 @@ struct EMIO_Info *EMIO_Init()
         gpiod_chip_close(info->chip);
         return 0;
     }
+    // Save lsb of address for use by block read/write
+    info->reg_addr_lsb_line = gpiod_line_bulk_get_line(&info->reg_addr_lines, 15);
 
     // Get op_done line, additional settings in SetEventMode
     info->op_done_line = gpiod_chip_get_line(info->chip, op_done_offset);
@@ -319,24 +322,14 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType, unsigned int 
             if (rc == 0)
                 printf("EMIO event timeout waiting for %s quadlet %d\n", opType, num);
             else if (rc < 0)
-                printf("EMIO event error (rc = %d) waiting for %s quadlet %d\n", rc, opType, num);
+                printf("EMIO event error waiting for %s quadlet %d\n", opType, num);
         }
         if (rc == 1) {
             // If successful, read event
             if (gpiod_line_event_read(info->op_done_line, &event) != 0) {
                 if (info->isVerbose)
-                    printf("Error reading event for %s quadlet %d\n", opType, num);
+                    printf("EMIO error reading event for %s quadlet %d\n", opType, num);
                 return false;
-            }
-            else if (info->isVerbose) {
-#ifdef USE_TIMEOFDAY
-                if (0)
-#else
-                if (info->doTiming > 0)
-#endif
-                    printf("Event occurred at %lf us\n", TimeDiff_us(&info->startTime, &event.ts));
-                else
-                    printf("Event occurred at %ld s, %ld ns\n", event.ts.tv_sec, event.ts.tv_nsec);
             }
         }
         ret = (rc == 1);
@@ -356,9 +349,9 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType, unsigned int 
            }
            if (info->isVerbose) {
                if (val < 0)
-                   printf("Error reading op_done for %s quadlet %d\n", opType, num);
+                   printf("EMIO error polling op_done for %s quadlet %d\n", opType, num);
                else if (val == 0)
-                   printf("Timeout waiting for %s quadlet %d\n", opType, num);
+                   printf("EMIO polling timeout waiting for %s quadlet %d\n", opType, num);
                else
                    printf("Waited %lf us for %s quadlet %d\n", dt, opType, num);
            }
@@ -366,21 +359,6 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType, unsigned int 
         ret = (val == 1);
     }
     return ret;
-}
-
-// Local method for efficient address increment
-static void IncrementAddress16(int *reg_addr_values)
-{
-    unsigned int i;
-    for (i = 15; i >= 0; i--) {
-        if (reg_addr_values[i] == 0) {
-            reg_addr_values[i] = 1;
-            break;
-        }
-        else {
-            reg_addr_values[i] = 0;
-        }
-    }
 }
 
 // EMIO_ReadQuadlet: read quadlet from specified address
@@ -727,13 +705,14 @@ bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsig
                  }
             }
 
-            // Increment address
-            IncrementAddress16(reg_addr_values);
-            // Write reg_addr (read address) last because address change
+            // Increment lsb of address
+            reg_addr_values[15] = ~reg_addr_values[15];
+
+            // Write reg_addr_lsb (lsb of read address) last because address change
             // will trigger read
-            if (gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values) != 0) {
+            if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
                 if (info->isVerbose)
-                    printf("EMIO_ReadBlock: error setting address %x\n", (addr+q));
+                    printf("EMIO_ReadBlock: error setting address for quadlet %d\n", q);
                 gpiod_line_set_value(info->req_bus_line, 0);
                 gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
                 return false;
@@ -921,7 +900,8 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
     for (q = 1; q < nQuads; q++) {
 
-        IncrementAddress16(reg_addr_values);
+        // Increment lsb of address
+        reg_addr_values[15] = ~reg_addr_values[15];
 
         val = bswap_32(data[q]);
         for (i = 0; i < 32; i++)
@@ -937,9 +917,15 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
             gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_values);
         }
 
-        // Write reg_addr (write address) last because address change
+        // Write reg_addr_lsb (lsb of write address) last because address change
         // will trigger actual write
-        gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values);
+        if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
+            if (info->isVerbose)
+                printf("EMIO_WriteBlock: error setting address for quadlet %d\n", q);
+            gpiod_line_set_value(info->req_bus_line, 0);
+            gpiod_line_set_value_bulk(&info->ctrl_lines, ctrl_zero);
+            return false;
+        }
 
         // op_done set by firmware, to indicate that quadlet
         // has been written
