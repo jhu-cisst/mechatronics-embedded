@@ -387,8 +387,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data)
 
     // Set all data lines to input
     if (!info->isInput) {
-        gpiod_line_release_bulk(&info->reg_data_lines);
-        if (gpiod_line_request_bulk_input(&info->reg_data_lines, "libfpgav3") != 0) {
+        if (gpiod_line_set_direction_input_bulk(&info->reg_data_lines) != 0) {
             printf("EMIO_ReadQuadlet: could not set data lines as input\n");
             return false;
         }
@@ -476,8 +475,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data)
 
     if (info->isInput) {
         // Set all data lines to output and write values
-        gpiod_line_release_bulk(&info->reg_data_lines);
-        if (gpiod_line_request_bulk_output(&info->reg_data_lines, "libfpgav3", reg_wdata_values) != 0) {
+        if (gpiod_line_set_direction_output_bulk(&info->reg_data_lines, reg_wdata_values) != 0) {
             printf("EMIO_WriteQuadlet: could not set data lines as output\n");
             return false;
         }
@@ -649,8 +647,7 @@ bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsig
 
     // Set all data lines to input
     if (!info->isInput) {
-        gpiod_line_release_bulk(&info->reg_data_lines);
-        if (gpiod_line_request_bulk_input(&info->reg_data_lines, "libfpgav3") != 0) {
+        if (gpiod_line_set_direction_input_bulk(&info->reg_data_lines) != 0) {
             printf("EMIO_ReadBlock: could not set data lines as input\n");
             return false;
         }
@@ -870,8 +867,7 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
     if (info->isInput) {
         // Set all data lines to output (and write values)
-        gpiod_line_release_bulk(&info->reg_data_lines);
-        if (gpiod_line_request_bulk_output(&info->reg_data_lines, "libfpgav3", reg_wdata_values) != 0) {
+        if (gpiod_line_set_direction_output_bulk(&info->reg_data_lines, reg_wdata_values) != 0) {
             printf("EMIO_WriteBlock: could not set data lines as output\n");
             return false;
         }
