@@ -187,6 +187,7 @@ struct EMIO_Info *EMIO_Init()
         return 0;
     }
     // Save lsb of address for use by block read/write
+    // TODO: not currently working
     info->reg_addr_lsb_line = gpiod_line_bulk_get_line(&info->reg_addr_lines, 15);
 
     // Get op_done line, additional settings in SetEventMode
@@ -710,7 +711,9 @@ bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsig
 
             // Write reg_addr_lsb (lsb of read address) last because address change
             // will trigger read
-            if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
+            // TODO: setting just the single line not working
+            //if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
+            if (gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values) != 0) {
                 if (info->isVerbose)
                     printf("EMIO_ReadBlock: error setting address for quadlet %d\n", q);
                 gpiod_line_set_value(info->req_bus_line, 0);
@@ -919,7 +922,9 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 
         // Write reg_addr_lsb (lsb of write address) last because address change
         // will trigger actual write
-        if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
+        // TODO: setting just the single line not working
+        //if (gpiod_line_set_value(info->reg_addr_lsb_line, reg_addr_values[15]) != 0) {
+        if (gpiod_line_set_value_bulk(&info->reg_addr_lines, reg_addr_values) != 0) {
             if (info->isVerbose)
                 printf("EMIO_WriteBlock: error setting address for quadlet %d\n", q);
             gpiod_line_set_value(info->req_bus_line, 0);
