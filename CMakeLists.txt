@@ -240,7 +240,7 @@ endif ()
 #    cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_clang_fpgav3.cmake  <path-to-source>
 
 # Root directory for Petalinux source files
-set (PETALINUX_SOURCE_DIR "${CMAKE_SOURCE_DIR}/petalinux")
+set (CC_PETALINUX_SOURCE_DIR "${CMAKE_SOURCE_DIR}/petalinux")
 
 if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
 
@@ -276,7 +276,7 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
   message (STATUS "Creating cc_vitis (cross-compile binary directory)")
   # Call CMake, passing in the toolchain file and root path for source files
   execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_VITIS}
-                                           -DPETALINUX_SOURCE_DIR=${PETALINUX_SOURCE_DIR}
+                                           -DPETALINUX_SOURCE_DIR=${CC_PETALINUX_SOURCE_DIR}
                                            "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
                   WORKING_DIRECTORY ${CC_VITIS_BINARY_DIR}
                   OUTPUT_QUIET ERROR_QUIET)
@@ -299,7 +299,7 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
   message (STATUS "Creating cc_clang (cross-compile binary directory)")
   # Call CMake, passing in the toolchain file and root path for source files
   execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_CLANG}
-                                           -DPETALINUX_SOURCE_DIR=${PETALINUX_SOURCE_DIR}
+                                           -DPETALINUX_SOURCE_DIR=${CC_PETALINUX_SOURCE_DIR}
                                            "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
                   WORKING_DIRECTORY ${CC_CLANG_BINARY_DIR}
                   OUTPUT_QUIET ERROR_QUIET)
