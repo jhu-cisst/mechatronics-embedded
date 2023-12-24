@@ -239,18 +239,21 @@ endif ()
 # To cross-compile with clang:
 #    cmake  -DCMAKE_TOOLCHAIN_FILE=<path-to-toolchain>/toolchain_clang_fpgav3.cmake  <path-to-source>
 
+# Root directory for Petalinux source files
+set (PETALINUX_SOURCE_DIR "${CMAKE_SOURCE_DIR}/petalinux")
+
 if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
 
   # Create a custom toolchain file for cross-compiling
-  set (TOOLCHAIN_FILE "${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake")
-  file (WRITE  ${TOOLCHAIN_FILE} "#\n# Toolchain file for FPGA V3\n#\n")
-  file (APPEND ${TOOLCHAIN_FILE} "# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake"
+  set (TOOLCHAIN_VITIS "${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake")
+  file (WRITE  ${TOOLCHAIN_VITIS} "#\n# Toolchain file for FPGA V3\n#\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "# Usage: cmake -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_BINARY_DIR}/toolchain_vitis_fpgav3.cmake"
                                  "  <path-to-source>\n\n")
-  file (APPEND ${TOOLCHAIN_FILE} "set (Sysroot ${PETALINUX_SYSROOT})\n")
-  file (APPEND ${TOOLCHAIN_FILE} "set (VITIS_ROOT ${VITIS_ROOT})\n\n")
-  file (APPEND ${TOOLCHAIN_FILE} "# Disable annoying linker warning about parameter passing change in GCC 7.1\n")
-  file (APPEND ${TOOLCHAIN_FILE} "SET (CMAKE_CXX_FLAGS \"\${CMAKE_CXX_FLAGS} -Wno-psabi\")\n\n")
-  file (APPEND ${TOOLCHAIN_FILE} "# Following is patched version from Xilinx repository\n\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "set (Sysroot ${PETALINUX_SYSROOT})\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "set (VITIS_ROOT ${VITIS_ROOT})\n\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "# Disable annoying linker warning about parameter passing change in GCC 7.1\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "SET (CMAKE_CXX_FLAGS \"\${CMAKE_CXX_FLAGS} -Wno-psabi\")\n\n")
+  file (APPEND ${TOOLCHAIN_VITIS} "# Following is patched version from Xilinx repository\n\n")
 
   # Fetch the Xilinx CMake modules
   include (FetchContent)
@@ -265,7 +268,18 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
   string (REPLACE "Arch \"arm64\"" "Arch \"arm32\"" FILE_CONTENTS "${FILE_CONTENTS}")
   # Remove call to find_package(Vitis) since we already define VITIS_ROOT
   string (REPLACE "find_package" "# find_package" FILE_CONTENTS "${FILE_CONTENTS}")
-  file (APPEND ${TOOLCHAIN_FILE} "${FILE_CONTENTS}")
+  file (APPEND ${TOOLCHAIN_VITIS} "${FILE_CONTENTS}")
+
+  # Create a binary directory for cross-compiling (cc_vitis)
+  set (CC_VITIS_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_vitis")
+  file (MAKE_DIRECTORY ${CC_VITIS_BINARY_DIR})
+  message (STATUS "Creating cc_vitis (cross-compile binary directory)")
+  # Call CMake, passing in the toolchain file and root path for source files
+  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_VITIS}
+                                           -DPETALINUX_SOURCE_DIR=${PETALINUX_SOURCE_DIR}
+                                           "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
+                  WORKING_DIRECTORY ${CC_VITIS_BINARY_DIR}
+                  OUTPUT_QUIET ERROR_QUIET)
 
 endif ()
 
@@ -273,8 +287,21 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
 
   set (GCC_VERSION "12.2.0")   # Xilinx 2023.1
 
+  set (TOOLCHAIN_CLANG "${CMAKE_CURRENT_BINARY_DIR}/toolchain_clang_fpgav3.cmake")
+
   configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain_clang_fpgav3.cmake.in"
-                  "${CMAKE_CURRENT_BINARY_DIR}/toolchain_clang_fpgav3.cmake"
+                  ${TOOLCHAIN_CLANG}
                   @ONLY)
+
+  # Create a binary directory for cross-compiling (cc_lang)
+  set (CC_CLANG_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_clang")
+  file (MAKE_DIRECTORY ${CC_CLANG_BINARY_DIR})
+  message (STATUS "Creating cc_clang (cross-compile binary directory)")
+  # Call CMake, passing in the toolchain file and root path for source files
+  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_CLANG}
+                                           -DPETALINUX_SOURCE_DIR=${PETALINUX_SOURCE_DIR}
+                                           "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
+                  WORKING_DIRECTORY ${CC_CLANG_BINARY_DIR}
+                  OUTPUT_QUIET ERROR_QUIET)
 
 endif ()
