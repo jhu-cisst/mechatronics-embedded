@@ -255,8 +255,10 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
                                  "  <path-to-source>\n\n")
   file (APPEND ${TOOLCHAIN_VITIS} "set (Sysroot ${PETALINUX_SYSROOT})\n")
   file (APPEND ${TOOLCHAIN_VITIS} "set (VITIS_ROOT ${VITIS_ROOT})\n\n")
-  file (APPEND ${TOOLCHAIN_VITIS} "# Disable annoying linker warning about parameter passing change in GCC 7.1\n")
-  file (APPEND ${TOOLCHAIN_VITIS} "SET (CMAKE_CXX_FLAGS \"\${CMAKE_CXX_FLAGS} -Wno-psabi\")\n\n")
+  if (NOT WIN32)
+    file (APPEND ${TOOLCHAIN_VITIS} "# Disable annoying linker warning about parameter passing change in GCC 7.1\n")
+    file (APPEND ${TOOLCHAIN_VITIS} "SET (CMAKE_CXX_FLAGS \"\${CMAKE_CXX_FLAGS} -Wno-psabi\")\n\n")
+  endif ()
   file (APPEND ${TOOLCHAIN_VITIS} "# Following is patched version from Xilinx repository\n\n")
 
   # Fetch the Xilinx CMake modules

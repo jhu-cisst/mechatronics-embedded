@@ -35,7 +35,7 @@ There are two supported platforms (and domains):
 
    2. Linux (`platform_linux`): This platform/domain is for applications that run on the Petalinux system. Although it is possible to add Linux applications to the Petalinux build (see below), it is usually more convenient to develop them here. It is recommended to use the petalinux-generated sysroot (see `fpgav3-sysroot-cortexa9.zip` below) rather than the default sysroot.
 
-3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above. The source files are in the `petalinux` sub-directory.
+3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above, or to cross-compile them as documented in the `cross_compile` subdirectory. The source files are in the `petalinux` sub-directory.
 
 ## Output Files
 
@@ -109,3 +109,15 @@ the CMake GUI.
 
 Petalinux 2022.2 and 2023.1 specify that the following packages should be installed (`apt-get install`):
 iproute2 gawk python3 python build-essential gcc git make net-tools libncurses5-dev tftpd zlib1g-dev libssl-dev flex bison libselinux1 gnupg wget git-core diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib automake zlib1g:i386 screen pax gzip cpio python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3
+
+## Building on Windows
+
+Building on Windows is not officially supported, although both Vivado and Vitis are available and thus it should be possible to build everything except Petalinux.
+
+We have not had success, however, running Vitis from Visual Studio, even when disabling parallel builds (e.g., in Visual Studio, Tools...Options...Projects and Solutions...Build and Run...maximum number of parallel project == 1).
+
+In addition, although the cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created, they currently are not functional.
+
+## Building on OS X
+
+None of the Xilinx tools are available on Mac OS X and therefore it is only possible to cross-compile. In particular, `clang` is well supported on OS X and can be used to cross-compile the custom fpgav3 library and apps used with Petalinux. See the `cross_compile` subdirectory for more information.
