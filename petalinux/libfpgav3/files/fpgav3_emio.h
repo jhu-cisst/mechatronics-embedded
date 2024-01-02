@@ -40,6 +40,10 @@ void EMIO_Release(struct EMIO_Info *info);
 // Get bus interface version number
 unsigned int EMIO_GetVersion(struct EMIO_Info *info);
 
+// Get/Set timeout value in microseconds
+double EMIO_GetTimeout_us(struct EMIO_Info *info);
+void EMIO_SetTimeout_us(struct EMIO_Info *info, double timeout_us);
+
 // Get/Set verbose flag (true -> prints messages when waiting for FPGA I/O to complete)
 bool EMIO_GetVerbose(struct EMIO_Info *info);
 void EMIO_SetVerbose(struct EMIO_Info *info, bool newState);

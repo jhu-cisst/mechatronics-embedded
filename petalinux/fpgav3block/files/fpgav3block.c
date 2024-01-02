@@ -108,6 +108,7 @@ int main(int argc, char **argv)
             printf("Configured to use polling");
         if (defaultEventMode) printf(" (default)");
         printf("\n");
+        printf("EMIO timeout is %lf us\n", EMIO_GetTimeout_us(info));
     }
 
     // Determine whether to read or write based on args_found

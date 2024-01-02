@@ -70,6 +70,7 @@ struct EMIO_Info {
     fpgav3_time_t startTime;   // Start time for measurement
     fpgav3_time_t endTime;     // End time for measurement
     double timingOverhead;     // Overhead due to timing calls
+    double timeout_us;         // Timeout in microseconds
 };
 
 struct EMIO_Info *EMIO_Init()
@@ -243,6 +244,9 @@ struct EMIO_Info *EMIO_Init()
     EMIO_SetEventMode(info, false);
     EMIO_SetTimingMode(info, 0);
 
+    // Set default wait timeout to 250 microseconds
+    info->timeout_us = 250.0;
+
     return info;
 }
 
@@ -260,6 +264,16 @@ void EMIO_Release(struct EMIO_Info *info)
 unsigned int EMIO_GetVersion(struct EMIO_Info *info)
 {
     return info ? info->version : 0;
+}
+
+double EMIO_GetTimeout_us(struct EMIO_Info *info)
+{
+    return info ? info->timeout_us : 0.0;
+}
+
+void EMIO_SetTimeout_us(struct EMIO_Info *info, double timeout_us)
+{
+    if (info) info->timeout_us = timeout_us;
 }
 
 bool EMIO_GetVerbose(struct EMIO_Info *info)
@@ -325,8 +339,8 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType, unsigned int 
     if (info->useEvents) {
         struct timespec timeout;
         struct gpiod_line_event event;
-        timeout.tv_sec = 0;
-        timeout.tv_nsec = 250000;  // 250 us
+        timeout.tv_sec = info->timeout_us*1.0e-6;
+        timeout.tv_nsec = (info->timeout_us - 1.0e6*timeout.tv_sec)*1.0e3;
         int rc = gpiod_line_event_wait(info->op_done_line, &timeout);
         if (info->isVerbose) {
             if (rc == 0)
@@ -352,7 +366,7 @@ static bool WaitOpDone(struct EMIO_Info *info, const char *opType, unsigned int 
            fpgav3_time_t curTime;
            GetCurTime(&waitStart);
            double dt = 0.0;   // elapsed time in us
-           while ((val <= 0) && (dt < 250.0)) {
+           while ((val <= 0) && (dt < info->timeout_us)) {
                val = gpiod_line_get_value(info->op_done_line);
                GetCurTime(&curTime);
                dt = TimeDiff_us(&waitStart, &curTime);
