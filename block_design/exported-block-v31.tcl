@@ -202,6 +202,8 @@ proc create_root_design { parentCell } {
 
 
   # Create ports
+  set RESETn_PHY_0 [ create_bd_port -dir O -type rst RESETn_PHY_0 ]
+  set RESETn_PHY_1 [ create_bd_port -dir O -type rst RESETn_PHY_1 ]
 
   # Create instance: gmii_to_rgmii_0, and set properties
   set gmii_to_rgmii_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:gmii_to_rgmii:4.1 gmii_to_rgmii_0 ]
@@ -353,7 +355,8 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net processing_system7_0_MDIO_ETHERNET_1 [get_bd_intf_pins gmii_to_rgmii_1/MDIO_GEM] [get_bd_intf_pins processing_system7_0/MDIO_ETHERNET_1]
 
   # Create port connections
-  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins gmii_to_rgmii_0/clkin] [get_bd_pins gmii_to_rgmii_1/clkin] [get_bd_pins processing_system7_0/FCLK_CLK0]
+  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins gmii_to_rgmii_0/clkin] [get_bd_pins gmii_to_rgmii_1/clkin]
+  connect_bd_net -net processing_system7_0_FCLK_RESET0_N [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_ports RESETn_PHY_0] [get_bd_ports RESETn_PHY_1]
 
   # Create address segments
 

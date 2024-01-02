@@ -271,7 +271,7 @@ int main(int argc, char **argv)
     if (fpga_sn[0])
         printf("FPGA S/N: %s\n", fpga_sn);
 
-    uint32_t reg_hw, reg_status;
+    uint32_t reg_hw, reg_status, reg_ethctrl;
     struct EMIO_Info *emio = EMIO_Init();
     if (!emio)
         return -1;
@@ -348,6 +348,13 @@ int main(int argc, char **argv)
         printf("Failed to set MAC or IP address for eth0\n");
     if (!SetMACandIP("eth1", 1, board_id))
         printf("Failed to set MAC or IP address for eth1\n");
+
+    printf("Enabling PS Ethernet (eth0 and eth1)\n");
+    // Bit 25: mask for PS Ethernet enable
+    // Bit  8: enable eth1
+    // Bit  0: enable eth0
+    reg_ethctrl = 0x02000101;
+    EMIO_WriteQuadlet(emio, 12, reg_ethctrl);
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers
