@@ -100,7 +100,7 @@ CONFIG_system-zynq=y
 #
 # dnf
 #
-# CONFIG_dnf is not set
+CONFIG_dnf=y
 
 #
 # e2fsprogs 
@@ -3271,7 +3271,7 @@ CONFIG_tcpdump=y
 # CONFIG_avahi-autoipd is not set
 # CONFIG_avahi-utils is not set
 # CONFIG_libavahi-common is not set
-# CONFIG_avahi-daemon is not set
+CONFIG_avahi-daemon=y
 # CONFIG_libavahi-gobject is not set
 
 #
