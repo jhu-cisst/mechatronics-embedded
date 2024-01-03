@@ -91,7 +91,7 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  BIT_FILE            ${BIT_FILE}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
 
-# *********************** Petalinux SDK (sysroot) **************************
+# *************** Petalinux generated output: MicroSD and sysroot (SDK) *********************
 
 # Directory for generated ZIP files (SD-Image and sysroot)
 set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}-generated")
@@ -99,20 +99,9 @@ set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}
 set (README_GEN "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
 file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
 
-if (BUILD_PETALINUX_SYSROOT)
+set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
 
-  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-sysroot-cortexa9.zip")
-  set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
-
-  file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
-
-  petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
-                       PROJ_NAME       ${PETALINUX_PROJ_NAME}
-                       SDK_INSTALL_DIR ${PETALINUX_SDK}
-                       SYSROOT_ZIP     ${PETALINUX_SYSROOT_ZIP}
-                       DEPENDENCIES    ${PETALINUX_BUILD_TARGET})
-
-endif ()
+# ***************************** Petalinux MicroSD zip file **********************************
 
 if (mechatronics-firmware_FOUND AND Vitis_FOUND)
 
@@ -199,8 +188,28 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMENT "Checking MicroSD Zip"
                      DEPENDS "MicroSDImage" ${PETALINUX_MICROSD_ZIP})
 
+  # The Petalinux SDK does not actually depend on the MicroSD zip file,
+  # but we set this dependency to control the build order
+  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_SDK_DEPENDENCIES} "MicroSDzip")
+
 else ()
 
   message (WARNING "Not configured to create MicroSD image")
+
+endif ()
+
+# *********************** Petalinux SDK (sysroot) **************************
+
+if (BUILD_PETALINUX_SYSROOT)
+
+  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-sysroot-cortexa9.zip")
+  set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
+  file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
+
+  petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
+                       PROJ_NAME       ${PETALINUX_PROJ_NAME}
+                       SDK_INSTALL_DIR ${PETALINUX_SDK}
+                       SYSROOT_ZIP     ${PETALINUX_SYSROOT_ZIP}
+                       DEPENDENCIES    ${PETALINUX_SDK_DEPENDENCIES})
 
 endif ()
