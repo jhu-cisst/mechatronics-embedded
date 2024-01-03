@@ -207,9 +207,22 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     if (sockfd == -1)
         return false;
 
+    // Set interface name
+    strcpy(ifr.ifr_name, ethName);
+
+    // Get flags
+    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) == -1)
+        return false;
+
+    // Disable interface (ifdown)
+    if (ifr.ifr_flags & IFF_UP) {
+        ifr.ifr_flags &= ~IFF_UP;
+        if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) == -1)
+            return false;
+    }
+
     // Set MAC address
     // The first 3 bytes are the JHU LCSR CID
-    strcpy(ifr.ifr_name, ethName);
     ifr.ifr_hwaddr.sa_data[0] = 0xFA;
     ifr.ifr_hwaddr.sa_data[1] = 0x61;
     ifr.ifr_hwaddr.sa_data[2] = 0x0E;
@@ -226,7 +239,20 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     ifr.ifr_addr.sa_family = AF_INET;
     struct sockaddr_in* addr = (struct sockaddr_in*)&ifr.ifr_addr;
     inet_pton(AF_INET, ip_addr, &addr->sin_addr);
-    return (ioctl(sockfd, SIOCSIFADDR, &ifr) != -1);
+    if (ioctl(sockfd, SIOCSIFADDR, &ifr) == -1)
+        return false;
+
+    // Set netmask
+    inet_pton(AF_INET, "255.255.0.0", &addr->sin_addr);
+    if (ioctl(sockfd, SIOCSIFNETMASK, &ifr) == -1)
+        return false;
+
+    // Enable interface
+    ifr.ifr_flags |= IFF_UP;
+    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) == -1)
+        return false;
+
+    return true;
 }
 
 // CopyQspiToFpga: Copy bytes from QSPI flash to FPGA PROM registers. This is
@@ -343,18 +369,18 @@ int main(int argc, char **argv)
         printf("Failed to mount SD card\n");
     }
 
-    printf("\nSetting Ethernet MAC and IP addresses\n\n");
-    if (!SetMACandIP("eth0", 0, board_id))
-        printf("Failed to set MAC or IP address for eth0\n");
-    if (!SetMACandIP("eth1", 1, board_id))
-        printf("Failed to set MAC or IP address for eth1\n");
-
-    printf("Enabling PS Ethernet (eth0 and eth1)\n");
+    printf("\nEnabling PS Ethernet (eth0 and eth1)\n");
     // Bit 25: mask for PS Ethernet enable
     // Bit  8: enable eth1
     // Bit  0: enable eth0
     reg_ethctrl = 0x02000101;
     EMIO_WriteQuadlet(emio, 12, reg_ethctrl);
+
+    printf("Setting Ethernet MAC and IP addresses\n");
+    if (!SetMACandIP("eth0", 0, board_id))
+        printf("Failed to set MAC or IP address for eth0\n");
+    if (!SetMACandIP("eth1", 1, board_id))
+        printf("Failed to set MAC or IP address for eth1\n");
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers
