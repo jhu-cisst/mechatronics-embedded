@@ -18,13 +18,16 @@ endif ()
 
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
+# Custom recipes-core
+set (PETALINUX_RECIPES_CORE "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
 
 petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
                   CONFIG_MENU        ${PETALINUX_MENU}
                   CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
-                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE})
+                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
+                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
 
 # ************************** fpgav3 library *******************************
 

@@ -10,7 +10,7 @@
  *   3) Exports FPGAV3 environment variables (to shell)
  *   4) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
  *   5) Copies qspi-boot.bin to flash if different
- *   6) Sets the Ethernet MAC and IP addresses
+ *   6) Enables Ethernet and sets the Ethernet MAC and IP addresses
  *   7) Copies FPGA serial number from QSPI to FPGA (via EMIO)
  */
 
@@ -21,7 +21,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <sys/ioctl.h>
@@ -141,7 +140,8 @@ bool ProgramFpga(const char *firmwareName)
     // Copy bit file from /media to /tmp
     char bitFile[32];
     sprintf(bitFile, "%s.bit", firmwareName);
-    CopyFile(bitFile, "/media", "/tmp");
+    if (!CopyFile(bitFile, "/media", "/tmp"))
+        return false;
 
     // Create bin file in /tmp
     printf("Converting bitstream %s\n", bitFile);
@@ -351,23 +351,12 @@ int main(int argc, char **argv)
     fpga_ver[3] = '\0';
     ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type], board_id);
 
-    printf("Mounting SD card\n");
-    if (mount("/dev/mmcblk0p1", "/media", "vfat", 0L, NULL) == 0) {
+    // MicroSD card should be auto-mounted
 
-        if (strlen(FirmwareName[board_type]) > 0)
-            ProgramFpga(FirmwareName[board_type]);
+    if (strlen(FirmwareName[board_type]) > 0)
+        ProgramFpga(FirmwareName[board_type]);
 
-        ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
-
-        // Unmount SD card from /media
-        printf("Unmounting SD card\n");
-        if (umount("/media")  != 0) {
-            printf("Warning: failed to unmount SD card\n");
-        }
-    }
-    else {
-        printf("Failed to mount SD card\n");
-    }
+    ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
 
     printf("\nEnabling PS Ethernet (eth0 and eth1)\n");
     // Bit 25: mask for PS Ethernet enable

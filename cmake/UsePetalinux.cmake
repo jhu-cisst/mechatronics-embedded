@@ -16,6 +16,7 @@
 #   - CONFIG_SRC         Source config
 #   - BSP_CFG_SRC        Source bsp.cfg
 #   - DEVICE_TREE_FILES  List of device tree files
+#   - RECIPES_CORE_SRC_DIR  Directory for recipes-core (optional)
 #
 # Description:
 #   This function creates the petalinux project. The CONFIG_SRC file (config) is copied to
@@ -35,6 +36,13 @@
 #   directories in the build tree.
 #   Note that this function only updates the "config" and "bsp.cfg" files;
 #   the "rootfs_config" is updated in petalinux_app_create and petalinux_build.
+#
+#   The RECIPES_CORE_SRC_DIR parameter is optional. If specified, the entire directory is
+#   copied from the source tree to the build tree. One limitation of the current implementation
+#   is that "cmake -E copy_directory" updates the file times and thus we do not have a dependency
+#   on modifications to the source files. This means that if any of the recipes-core files
+#   are changed, the easiest solution is to delete the file config.cfg in the build tree,
+#   which will force the directory to be copied.
 #
 ##########################################################################################
 #
@@ -151,7 +159,8 @@ function (petalinux_create ...)
        CONFIG_MENU
        CONFIG_SRC
        BSP_CFG_SRC
-       DEVICE_TREE_FILES)
+       DEVICE_TREE_FILES
+       RECIPES_CORE_SRC_DIR)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -238,6 +247,14 @@ function (petalinux_create ...)
         # if one of the hw-description entries is updated).
         DEPENDS ${PETALINUX_CREATE_OUTPUT} ${HW_FILE} ${CONFIG_SRC})
 
+    set (RECIPES_CORE_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-core")
+
+    if (RECIPES_CORE_SRC_DIR)
+        set (RECIPES_CORE_CMD "copy_directory")
+    else ()
+        set (RECIPES_CORE_CMD "true")
+    endif()
+
     # Output from configuring kernel
     set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.cfg")
 
@@ -248,6 +265,11 @@ function (petalinux_create ...)
                   ARGS -E copy_if_different
                   ${BSP_CFG_SRC}
                   ${KERNEL_CFG_DIR}
+        # Copy the recipes-core directory (if specified above)
+        COMMAND ${CMAKE_COMMAND}
+                ARGS -E ${RECIPES_CORE_CMD}
+                ${RECIPES_CORE_SRC_DIR}
+                ${RECIPES_CORE_BIN_DIR}
         # Copy the device-tree file if needed
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
