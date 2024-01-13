@@ -171,15 +171,6 @@ int main()
 #endif
 	print_app_header();
 
-	// JHU MOD: added prompt to specify Ethernet port
-	xil_printf("Select port (1 or 2): ");
-	char port = inbyte();
-	while ((port != '1') && (port != '2'))
-		port = inbyte();
-	xil_printf("\r\nSelected port Eth%c\r\n", port);
-	if (port == '2')
-		ECHO_EMAC_BASEADDR = XPAR_XEMACPS_1_BASEADDR;
-
 	lwip_init();
 
 #if (LWIP_IPV6 == 0)

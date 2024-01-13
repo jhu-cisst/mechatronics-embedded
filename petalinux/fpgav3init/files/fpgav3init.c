@@ -10,7 +10,7 @@
  *   3) Exports FPGAV3 environment variables (to shell)
  *   4) Loads correct firmware based on detected board type (QLA, DQLA, DRAC)
  *   5) Copies qspi-boot.bin to flash if different
- *   6) Enables Ethernet and sets the Ethernet MAC and IP addresses
+ *   6) Sets the Ethernet MAC and IP addresses
  *   7) Copies FPGA serial number from QSPI to FPGA (via EMIO)
  */
 
@@ -358,18 +358,9 @@ int main(int argc, char **argv)
 
     ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
 
-    printf("\nEnabling PS Ethernet (eth0 and eth1)\n");
-    // Bit 25: mask for PS Ethernet enable
-    // Bit  8: enable eth1
-    // Bit  0: enable eth0
-    reg_ethctrl = 0x02000101;
-    EMIO_WriteQuadlet(emio, 12, reg_ethctrl);
-
     printf("Setting Ethernet MAC and IP addresses\n");
     if (!SetMACandIP("eth0", 0, board_id))
         printf("Failed to set MAC or IP address for eth0\n");
-    if (!SetMACandIP("eth1", 1, board_id))
-        printf("Failed to set MAC or IP address for eth1\n");
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers

@@ -22,27 +22,6 @@
         };
     };
 };  
-      
-&gem1 {
-    local-mac-address = [fa 61 0e 03 01 00];
-    phy-handle = <&extphy1>;
-    phy-mode="rgmii-id";
-    status = "okay";
-    xlnx,has-mdio = <0x1>;
-    mdio {
-        #address-cells = <1>;
-        #size-cells = <0>;
-        extphy1: phy@1 {
-            device_type = "ethernet-phy";
-            reg = <1>;
-        };
-        gmii_to_rgmii_1: gmii_to_rgmii_1@8 {
-            compatible = "xlnx,gmii-to-rgmii-1.0";
-            phy-handle = <&extphy1>;
-            reg = <8>;
-        };
-    };
-};  
 
 &qspi {
     status = "okay";

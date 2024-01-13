@@ -408,6 +408,7 @@ function (vitis_create OBJECT_TYPE ...)
                         DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
 
     add_custom_target(${TARGET_NAME} ALL
+                      COMMENT "Checking ${TARGET_NAME}"
                       DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS} ${PLATFORM_NAME} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
@@ -483,6 +484,7 @@ function (vitis_boot_create ...)
                         DEPENDS ${FSBL_FILE} ${BIT_FILE} ${APP_FILE} ${DEPENDENCIES})
 
     add_custom_target(${BIF_NAME} ALL
+                      COMMENT "Checking ${BIF_NAME}"
                       DEPENDS ${BOOT_FILE})
 
   else ()
