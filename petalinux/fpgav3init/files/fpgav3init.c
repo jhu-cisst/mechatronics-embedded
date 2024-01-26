@@ -358,6 +358,14 @@ int main(int argc, char **argv)
 
     ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
 
+    printf("\nEnabling PS Ethernet\n");
+    // Bit 25: mask for PS Ethernet enable
+    // Bit 16: enable PS eth (Rev 9)
+    // Bit  8: enable eth1 (Rev 8)
+    // Bit  0: enable eth0 (Rev 8)
+    reg_ethctrl = 0x02010101;
+    EMIO_WriteQuadlet(emio, 12, reg_ethctrl);
+
     printf("Setting Ethernet MAC and IP addresses\n");
     if (!SetMACandIP("eth0", 0, board_id))
         printf("Failed to set MAC or IP address for eth0\n");
