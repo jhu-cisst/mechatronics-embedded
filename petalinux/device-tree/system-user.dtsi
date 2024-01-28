@@ -5,20 +5,14 @@
 &gem0 {
     local-mac-address = [fa 61 0e 03 00 00];
     phy-handle = <&extphy0>;
-    phy-mode="rgmii-id";
+    phy-mode="gmii";
     status = "okay";
     xlnx,has-mdio = <0x1>;
     mdio {
         #address-cells = <1>;
         #size-cells = <0>;
-        extphy0: phy@1 {
-            device_type = "ethernet-phy";
+        extphy0: ethernet-phy@1 {
             reg = <1>;
-        };
-        gmii_to_rgmii_0: gmii_to_rgmii_0@8 {
-            compatible = "xlnx,gmii-to-rgmii-1.0";
-            phy-handle = <&extphy0>;
-            reg = <8>;
         };
     };
 };  
