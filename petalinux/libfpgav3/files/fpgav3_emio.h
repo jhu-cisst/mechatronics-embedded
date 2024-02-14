@@ -76,8 +76,7 @@ bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data);
 bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data);
 
 // EMIO_ReadBlock
-//   Reads a block of 32-bit data from the FPGA. This implementation makes multiple
-//   calls to EMIO_ReadQuadlet.
+//   Reads a block of 32-bit data from the FPGA.
 // Parameters:
 //     addr   16-bit register address
 //     data   pointer to location for storing 32-bit data
@@ -86,9 +85,7 @@ bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data);
 bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes);
 
 // EMIO_WriteBlock
-//   Write a block of 32-bit data to the FPGA. This temporary implementation makes multiple
-//   calls to EMIO_WriteQuadlet, which does not issue all block write signals, such as
-//   blk_wstart and blk_wen.
+//   Write a block of 32-bit data to the FPGA.
 // Parameters:
 //     addr   16-bit register address
 //     data   pointer to location that contains 32-bit data

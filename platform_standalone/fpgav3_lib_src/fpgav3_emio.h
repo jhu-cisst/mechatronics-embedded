@@ -14,12 +14,20 @@
 #define FPGAV3_EMIO_H
 
 #include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // EMIO_Init
 //
 //   Initializes EMIO to provide an interface to the internal read and write buses
 //   on the FPGA.
 void EMIO_Init();
+
+// Get bus interface version number
+unsigned int EMIO_GetVersion();
 
 // EMIO_ReadQuadlet
 //   Reads a quadlet (32-bit register) from the FPGA.
@@ -37,6 +45,24 @@ bool EMIO_ReadQuadlet(uint16_t addr, uint32_t *data);
 // Returns:  true if success
 bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data);
 
+// EMIO_ReadBlock
+//   Reads a block of 32-bit data from the FPGA.
+// Parameters:
+//     addr   16-bit register address
+//     data   pointer to location for storing 32-bit data
+//     nBytes number of bytes to read (rounds up to multiple of 4)
+// Returns:  true if success
+bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes);
+
+// EMIO_WriteBlock
+//   Write a block of 32-bit data to the FPGA.
+// Parameters:
+//     addr   16-bit register address
+//     data   pointer to location that contains 32-bit data
+//     nBytes number of bytes to write (rounds up to multiple of 4)
+// Returns:  true if success
+bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes);
+
 // EMIO_WritePromData
 //   Writes the specified bytes to the PROM registers on the FPGA
 //   (this is intended to be used to copy the FPGA S/N to the PROM).
@@ -45,5 +71,9 @@ bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data);
 //     nBytes  number of data bytes (will be rounded up to multiple of 4)
 // Returns:    true if success
 bool EMIO_WritePromData(char *data, unsigned int nBytes);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif // FPGAV3_EMIO_H
