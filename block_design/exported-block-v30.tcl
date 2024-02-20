@@ -216,7 +216,7 @@ proc create_root_design { parentCell } {
   # Create ports
   set RESETn_PHY_0 [ create_bd_port -dir O -type rst RESETn_PHY_0 ]
   set ENET0_EXT_INTIN_0 [ create_bd_port -dir I -type intr ENET0_EXT_INTIN_0 ]
-  set FCLK_CLK1_0 [ create_bd_port -dir O -type clk FCLK_CLK1_0 ]
+  set FCLK_CLK1_125 [ create_bd_port -dir O -type clk FCLK_CLK1_125 ]
   set link_status_0 [ create_bd_port -dir O link_status_0 ]
   set link_status_1 [ create_bd_port -dir O link_status_1 ]
   set clock_speed_0 [ create_bd_port -dir O -from 1 -to 0 clock_speed_0 ]
@@ -247,7 +247,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ACT_ENET0_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_ENET1_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_FPGA0_PERIPHERAL_FREQMHZ {200.000000} \
-    CONFIG.PCW_ACT_FPGA1_PERIPHERAL_FREQMHZ {250.000000} \
+    CONFIG.PCW_ACT_FPGA1_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_FPGA2_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_FPGA3_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_PCAP_PERIPHERAL_FREQMHZ {200.000000} \
@@ -265,7 +265,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ACT_UART_PERIPHERAL_FREQMHZ {100.000000} \
     CONFIG.PCW_ACT_WDT_PERIPHERAL_FREQMHZ {111.111115} \
     CONFIG.PCW_CLK0_FREQ {200000000} \
-    CONFIG.PCW_CLK1_FREQ {250000000} \
+    CONFIG.PCW_CLK1_FREQ {125000000} \
     CONFIG.PCW_CLK2_FREQ {10000000} \
     CONFIG.PCW_CLK3_FREQ {10000000} \
     CONFIG.PCW_DDR_RAM_HIGHADDR {0x3FFFFFFF} \
@@ -287,7 +287,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_EN_UART1 {1} \
     CONFIG.PCW_FCLK_CLK1_BUF {TRUE} \
     CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {200} \
-    CONFIG.PCW_FPGA1_PERIPHERAL_FREQMHZ {250} \
+    CONFIG.PCW_FPGA1_PERIPHERAL_FREQMHZ {125} \
     CONFIG.PCW_FPGA_FCLK0_ENABLE {1} \
     CONFIG.PCW_FPGA_FCLK1_ENABLE {1} \
     CONFIG.PCW_MIO_1_IOTYPE {LVCMOS 3.3V} \
@@ -386,7 +386,7 @@ proc create_root_design { parentCell } {
   connect_bd_net -net gmii_to_rgmii_1_link_status [get_bd_pins gmii_to_rgmii_1/link_status] [get_bd_ports link_status_1]
   connect_bd_net -net gmii_to_rgmii_1_speed_mode [get_bd_pins gmii_to_rgmii_1/speed_mode] [get_bd_ports speed_mode_1]
   connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins gmii_to_rgmii_0/clkin] [get_bd_pins gmii_to_rgmii_1/clkin]
-  connect_bd_net -net processing_system7_0_FCLK_CLK1 [get_bd_pins processing_system7_0/FCLK_CLK1] [get_bd_ports FCLK_CLK1_0]
+  connect_bd_net -net processing_system7_0_FCLK_CLK1 [get_bd_pins processing_system7_0/FCLK_CLK1] [get_bd_ports FCLK_CLK1_125]
   connect_bd_net -net processing_system7_0_FCLK_RESET0_N [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_ports RESETn_PHY_0]
 
   # Create address segments
