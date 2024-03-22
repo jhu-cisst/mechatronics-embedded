@@ -56,6 +56,9 @@
 #   Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
 #   causes that compiler option to be removed.
 #
+#   TEMPLATE_NAME can be "Empty Application (C++)", "Linux Empty Application",
+#   or "Linux Hello World", where the latter two use C.
+#
 #   The optional DEPENDENCIES parameter can specify additional dependencies, beyond
 #   the assumed dependency on TARGET_LIBS.
 #

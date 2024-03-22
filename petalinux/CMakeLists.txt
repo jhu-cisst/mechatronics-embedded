@@ -32,9 +32,9 @@ petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
 # ************************** fpgav3 library *******************************
 
 set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.c"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.c"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/Makefile")
 
 set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
@@ -42,11 +42,12 @@ set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
 petalinux_app_create (APP_NAME       "libfpgav3"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${LIBFPGAV3_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${LIBFPGAV3_BB})
 
 # ************************** fpgav3init app *******************************
 
-set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.c"
+set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.cpp"
                         "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.service")
 
 set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbappend")
@@ -54,28 +55,31 @@ set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbap
 petalinux_app_create (APP_NAME       "fpgav3init"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3INIT_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${FPGAV3INIT_BBAPPEND})
 
 # ************************** fpgav3sn app ********************************
 
-set (FPGAV3SN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/files/fpgav3sn.c")
+set (FPGAV3SN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/files/fpgav3sn.cpp")
 
 set (FPGAV3SN_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/fpgav3sn.bbappend")
 
 petalinux_app_create (APP_NAME       "fpgav3sn"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3SN_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${FPGAV3SN_BBAPPEND})
 
 # ************************** fpgav3block app *******************************
 
-set (FPGAV3BLOCK_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3block/files/fpgav3block.c")
+set (FPGAV3BLOCK_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3block/files/fpgav3block.cpp")
 
 set (FPGAV3BLOCK_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3block/fpgav3block.bbappend")
 
 petalinux_app_create (APP_NAME       "fpgav3block"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3BLOCK_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${FPGAV3BLOCK_BBAPPEND})
 
 # ************************** Petalinux build *******************************

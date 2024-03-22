@@ -45,7 +45,7 @@ if (USE_PETALINUX_SYSROOT)
   set (FPGAV3INIT_TARGET "fpgav3initonly")
 
   # Additional source files
-  set (FPGAV3INIT_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/fpgav3init/files/fpgav3init.c")
+  set (FPGAV3INIT_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/fpgav3init/files/fpgav3init.cpp")
 
   if (BUILD_PETALINUX_SYSROOT)
 
@@ -53,7 +53,7 @@ if (USE_PETALINUX_SYSROOT)
         TARGET_NAME    ${FPGAV3INIT_TARGET}
         APP_NAME       ${FPGAV3INIT_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
-        TEMPLATE_NAME  "Linux Empty Application"
+        TEMPLATE_NAME  "Empty Application (C++)"
         ADD_SOURCE     ${FPGAV3INIT_SOURCE}
         LIBRARIES      "fpgav3"
         BUILD_CONFIG   "Release"
@@ -68,7 +68,7 @@ if (USE_PETALINUX_SYSROOT)
         TARGET_NAME    ${FPGAV3INIT_TARGET}
         APP_NAME       ${FPGAV3INIT_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
-        TEMPLATE_NAME  "Linux Empty Application"
+        TEMPLATE_NAME  "Empty Application (C++)"
         ADD_SOURCE     ${FPGAV3INIT_SOURCE}
         LIBRARIES      "fpgav3"
         BUILD_CONFIG   "Release")
@@ -93,9 +93,9 @@ if (USE_PETALINUX_SYSROOT)
   set (LIBFPGAV3_TARGET "libfpgav3only")
 
   # Additional source files
-  set (LIBFPGAV3_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.c"
+  set (LIBFPGAV3_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.h"
-                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.c"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.h")
 
 

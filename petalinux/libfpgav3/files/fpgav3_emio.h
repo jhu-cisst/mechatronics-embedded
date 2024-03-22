@@ -18,10 +18,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Return GPIOD library version string
 const char *EMIO_gpiod_version_string();
 
@@ -102,11 +98,6 @@ bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsi
 // Returns:    true if success
 bool EMIO_WritePromData(struct EMIO_Info *info, char *data, unsigned int nBytes);
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
-#ifdef __cplusplus
 class EMIO_Interface
 {
 
@@ -151,6 +142,5 @@ public:
     { return EMIO_WritePromData(info, data, nBytes); }
 
 };
-#endif
 
 #endif // FPGAV3_EMIO_H
