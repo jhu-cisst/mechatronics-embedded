@@ -9,12 +9,13 @@
  * cause it to assume quadlet read/write.
  */
 
+#include <iostream>
+#include <iomanip>
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
-#include <byteswap.h>
 #include <string.h>
-#include <fpgav3_emio.h>
+#include <byteswap.h>
+#include <fpgav3_emio_gpiod.h>
 
 int main(int argc, char **argv)
 {
@@ -52,63 +53,62 @@ int main(int argc, char **argv)
                 data1 = strtoul(argv[i], 0, 16);
             else if ((args_found == 1) && (!isQuad)) {
                 num = strtoul(argv[i], 0, 10);
-                /* Allocate data array, initializing contents to 0 */
-                data = (uint32_t *) calloc(num, sizeof(uint32_t));
-                if (!data) {
-                    printf("Failed to allocate memory for %d quadlets", num);
-                    return -1;
-                }
+                // Allocate data array, initializing contents to 0
+                data = new uint32_t[num];
+                memset(data, 0, sizeof(data));
             }
             else if (!isQuad && (j < num))
                 data[j++] = bswap_32(strtoul(argv[i], 0, 16));
             else
-                printf("Warning: extra parameter: %s\n", argv[i]);
+                std::cout << "Warning: extra parameter: " << argv[i] << std::endl;
 
             args_found++;
         }
     }
 
     if (args_found < 1) {
+        std::cout << "Usage: " << argv[0] << " [-v] [-e<n>] [-t<n>] <address in hex> ";
         if (isQuad)
-            printf("Usage: %s [-v] [-e<n>] [-t<n>] <address in hex> [value to write in hex]\n", argv[0]);
+            std::cout << "[value to write in hex]" << std::endl;
         else
-            printf("Usage: %s [-v]  <address in hex> <number of quadlets> [write data quadlets in hex]\n", argv[0]);
-        printf("       where -v is for verbose output\n");
-        printf("             -e<n> is to use polling (0) or events (1)\n");
-        printf("             -t<n> is for timing measurement: 0 (no timing), 1 (total time only), 2+ (all timing)\n");
+            std::cout << "<address in hex> <number of quadlets> [write data quadlets in hex]" << std::endl;
+        std::cout << "       where -v is for verbose output" << std::endl
+                  << "             -e<n> is to use polling (0) or events (1)" << std::endl
+                  << "             -t<n> is for timing measurement: 0 (no timing), 1 (total time only), 2+ (all timing)"
+                  << std::endl;
         return 0;
     }
 
-    struct EMIO_Info *info = EMIO_Init();
-    if (info == 0) {
-        printf("Error initializing EMIO bus interface\n");
+    EMIO_Interface_Gpiod emio;
+    if (!emio.IsOK()) {
+        std::cout << "Error initializing EMIO bus interface" << std::endl;
         return -1;
     }
 
-    EMIO_SetVerbose(info, isVerbose);
+    emio.SetVerbose(isVerbose);
 
     bool defaultEventMode = true;
     if (eventMode == 0) {
-        EMIO_SetEventMode(info, false);
+        emio.SetEventMode(false);
         defaultEventMode = false;
     }
     else if (eventMode == 1) {
-        EMIO_SetEventMode(info, true);
+        emio.SetEventMode(true);
         defaultEventMode = false;
     }
 
-    EMIO_SetTimingMode(info, timingMode);
+    emio.SetTimingMode(timingMode);
 
     if (isVerbose) {
-        printf("GPIOD library version %s\n", EMIO_gpiod_version_string());
-        printf("EMIO bus interface version %d\n", EMIO_GetVersion(info));
-        if (EMIO_GetEventMode(info))
-            printf("Configured to use events");
+        std::cout << "GPIOD library version " << EMIO_gpiod_version_string() << std::endl;
+        std::cout << "EMIO bus interface version " << emio.GetVersion() << std::endl;
+        if (emio.GetEventMode())
+            std::cout << "Configured to use events";
         else
-            printf("Configured to use polling");
-        if (defaultEventMode) printf(" (default)");
-        printf("\n");
-        printf("EMIO timeout is %lf us\n", EMIO_GetTimeout_us(info));
+            std::cout << "Configured to use polling";
+        if (defaultEventMode) std::cout << " (default)";
+        std::cout << std::endl;
+        std::cout << "EMIO timeout is " << emio.GetTimeout_us() << " us" << std::endl;
     }
 
     // Determine whether to read or write based on args_found
@@ -117,13 +117,13 @@ int main(int argc, char **argv)
     {
         // Read the data and print out the values (if no error)
         if (num == 1) {
-            if (EMIO_ReadQuadlet(info, addr, &data1))
-                printf("0x%08X\n", data1);
+            if (emio.ReadQuadlet(addr, data1))
+                std::cout << "0x" << std::hex << std::setw(8) << std::setfill('0') << data1 << std::endl;
         }
         else if (num > 1) {
-            if (EMIO_ReadBlock(info, addr, data, 4*num)) {
+            if (emio.ReadBlock(addr, data, 4*num)) {
                 for (j = 0; j < num; j++)
-                    printf("0x%08X\n", bswap_32(data[j]));
+                    std::cout << "0x" << std::hex << std::setw(8) << std::setfill('0') << bswap_32(data[j]) << std::endl;
             }
         }
     }
@@ -132,15 +132,14 @@ int main(int argc, char **argv)
         bool ret = false;
         if (num == 1) {
             if (!isQuad) data1 = data[0];
-            ret = EMIO_WriteQuadlet(info, addr, data1);
+            ret = emio.WriteQuadlet(addr, data1);
         }
         else if (num > 1)
-            ret = EMIO_WriteBlock(info, addr, data, 4*num);
+            ret = emio.WriteBlock(addr, data, 4*num);
         if (!ret)
-            printf("Write failed\n");
+            std::cout << "Write failed" << std::endl;
     }
 
-    EMIO_Release(info);
-    free(data);
+    delete [] data;
     return 0;
 }

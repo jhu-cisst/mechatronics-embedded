@@ -16,6 +16,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
+#include <iomanip>
+#include <string>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -28,7 +31,7 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
-#include <fpgav3_emio.h>
+#include <fpgav3_emio_gpiod.h>
 #include <fpgav3_qspi.h>
 
 // Detected board type
@@ -38,69 +41,61 @@ char *FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394
 
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
-bool CopyFile(const char *filename, const char *srcDir, const char *destDir)
+bool CopyFile(const std::string &filename, const std::string &srcDir, const std::string &destDir)
 {
-    size_t srcNameSize = strlen(srcDir)+strlen(filename)+2;
-    char *srcFile = (char *) malloc(srcNameSize);
-    sprintf(srcFile, "%s/%s", srcDir, filename);
-    size_t destNameSize = strlen(destDir)+strlen(filename)+2;
-    int src_fd = open(srcFile, O_RDONLY);
+    std::string srcFile(srcDir + "/" + filename);
+    int src_fd = open(srcFile.c_str(), O_RDONLY);
     if (src_fd == -1) {
-        printf("CopyFile: could not open source file %s\n", srcFile);
-        free(srcFile);
+        std::cout << "CopyFile: could not open source file " << srcFile << std::endl;
         return false;
     }
 
-    char *destFile = (char *) malloc(destNameSize);
-    sprintf(destFile, "%s/%s", destDir, filename);
+    std::string destFile(destDir + "/" + filename);
     mode_t mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH;
-    int dest_fd = open(destFile, O_WRONLY|O_CREAT|O_TRUNC, mode);
+    int dest_fd = open(destFile.c_str(), O_WRONLY|O_CREAT|O_TRUNC, mode);
     if (dest_fd == -1) {
-        printf("CopyFile: could not open destination file %s\n", destFile);
+        std::cout << "CopyFile: could not open destination file " << destFile << std::endl;
         close(src_fd);
-        free(srcFile);
-        free(destFile);
         return false;
     }
     struct stat src_stat;
     fstat(src_fd, &src_stat);
-    printf("Copying %s from %s to %s (%ld bytes)\n", filename, srcDir, destDir, src_stat.st_size);
+    std::cout << "Copying " << filename << " from " << srcDir << " to " << destDir
+              << " ( " << src_stat.st_size << " bytes)" << std::endl;
     ssize_t nwritten = sendfile(dest_fd, src_fd, NULL, src_stat.st_size);
     if (nwritten != src_stat.st_size) {
-        printf("Warning: wrote %d bytes\n", nwritten);
+        std::cout << "Warning: wrote " << nwritten << " bytes" << std::endl;
     }
     close(src_fd);
     close(dest_fd);
-    free(srcFile);
-    free(destFile);
     return true;
 }
 
-bool ConvertBitstream(const char *firmwareName, const char *fileDir)
+bool ConvertBitstream(const char *firmwareName, const std::string &fileDir)
 {
     char bifFile[40];
     char bitFile[40];
     char sysCmd[128];
 
-    sprintf(bifFile, "%s/%s.bif", fileDir, firmwareName);
+    sprintf(bifFile, "%s/%s.bif", fileDir.c_str(), firmwareName);
     FILE *fp = fopen(bifFile, "w");
     if (fp == NULL) {
         printf("Error opening %s\n", bifFile);
         return false;
     }
 
-    sprintf(bitFile, "%s/%s.bit", fileDir, firmwareName);
+    sprintf(bitFile, "%s/%s.bit", fileDir.c_str(), firmwareName);
     fprintf(fp, "all:\n{\n    %s\n}\n", bitFile);
     fclose(fp);
 
     sprintf(sysCmd, "bootgen -image %s -arch zynq -w on -process_bitstream bin", bifFile);
     int ret = system(sysCmd);
     if (ret != 0)
-        printf("bootgen failed, return code %d\n", ret);
+        std::cout << "bootgen failed, return code " << ret << std::endl;
     return (ret == 0);
 }
 
-bool FpgaLoad(const char *binFile)
+bool FpgaLoad(const std::string &binFile)
 {
     int fd;
     int nWrite;
@@ -108,27 +103,27 @@ bool FpgaLoad(const char *binFile)
     // Write '0' to flags
     fd = open("/sys/class/fpga_manager/fpga0/flags", O_WRONLY);
     if (fd == -1) {
-        printf("FpgaLoad: could not open FPGA flags\n");
+        std::cout << "FpgaLoad: could not open FPGA flags" << std::endl;
         return false;
     }
     char str[2] = { '0', 0 };
     nWrite = write(fd, str, sizeof(str));
     close(fd);
     if (nWrite != sizeof(str)) {
-        printf("FpgaLoad: error writing to FPGA flags, return code %d\n", nWrite);
+        std::cout << "FpgaLoad: error writing to FPGA flags, return code "<< nWrite << std::endl;
         return false;
     }
 
     // Open destination (FPGA) for writing
     fd = open("/sys/class/fpga_manager/fpga0/firmware", O_WRONLY);
     if (fd == -1) {
-        printf("FpgaLoad: could not open FPGA firmware\n");
+        std::cout << "FpgaLoad: could not open FPGA firmware" << std::endl;
         return false;
     }
-    nWrite = write(fd, binFile, strlen(binFile)+1);
+    nWrite = write(fd, binFile.c_str(), binFile.size()+1);
     close(fd);
-    if (nWrite != strlen(binFile)+1) {
-        printf("FpgaLoad: error writing to FPGA firmware, return code %d\n", nWrite);
+    if (nWrite != binFile.size()+1) {
+        std::cout << "FpgaLoad: error writing to FPGA firmware, return code " << nWrite << std::endl;
         return false;
     }
 
@@ -144,7 +139,7 @@ bool ProgramFpga(const char *firmwareName)
         return false;
 
     // Create bin file in /tmp
-    printf("Converting bitstream %s\n", bitFile);
+    std::cout << "Converting bitstream " << bitFile << std::endl;
     if (!ConvertBitstream(firmwareName, "/tmp"))
         return false;
 
@@ -152,12 +147,12 @@ bool ProgramFpga(const char *firmwareName)
     struct stat dir_stat;
     stat("/lib/firmware", &dir_stat);
     if (S_ISDIR(dir_stat.st_mode)) {
-        printf("Directory /lib/firmware already exists\n");
+        std::cout << "Directory /lib/firmware already exists" << std::endl;
     }
     else {
-        printf("Creating directory /lib/firmware\n");
+        std::cout << "Creating directory /lib/firmware" << std::endl;
         if (mkdir("/lib/firmware", S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) != 0) {
-            printf("Failed to create directory\n");
+            std::cout << "Failed to create directory" << std::endl;
             return false;
         }
     }
@@ -168,7 +163,7 @@ bool ProgramFpga(const char *firmwareName)
     sprintf(binFile, "%s.bin", bitFile);
     CopyFile(binFile, "/tmp", "/lib/firmware");
 
-    printf("Loading bitstream to FPGA\n");
+    std::cout << "Loading bitstream to FPGA" << std::endl;
     return FpgaLoad(binFile);
 }
 
@@ -178,7 +173,7 @@ bool ExportFpgaInfo(char *fpga_ver, char *fpga_sn, char *board_type, unsigned in
     mode_t mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
     int fd = open("/etc/profile.d/fpgav3.sh", O_WRONLY|O_CREAT|O_TRUNC, mode);
     if (fd == -1) {
-        printf("ExportFpgaInfo: could not open /etc/profile.d/fpgav3.sh\n");
+        std::cout << "ExportFpgaInfo: could not open /etc/profile.d/fpgav3.sh" << std::endl;
         return false;
     }
     char buf[64];
@@ -259,51 +254,50 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
 //   used to copy the FPGA S/N (first 16 bytes).
 // Parameters:
 //    qspiDev   QSPI device name (e.g., "/dev/mtd4ro")
-//    emio      EMIO_Info structure used to write to FPGA registers via EMIO
+//    emio      EMIO_Interface object used to write to FPGA registers via EMIO
 //    nbytes    Number of bytes to copy
 
-bool CopyQspiToFpga(char *qspiDev, struct EMIO_Info *emio, uint16_t nbytes)
+bool CopyQspiToFpga(const std::string &qspiDev, EMIO_Interface *emio, uint16_t nbytes)
 {
-    int fd = open(qspiDev, O_RDONLY);
+    int fd = open(qspiDev.c_str(), O_RDONLY);
     if (fd < 0) {
-        printf("CopyQspiToFpga: cannot open QSPI flash device %s\n", qspiDev);
+        std::cout << "CopyQspiToFpga: cannot open QSPI flash device " << qspiDev << std::endl;
         return false;
     }
 
     // Round up to nearest multiple of 4
     uint16_t nQuads = (nbytes+3)/4;
     nbytes = 4*nQuads;
-    char *data = (char *) malloc(nbytes);
+    char *data = new char[nbytes];
     int n = read(fd, data, nbytes);
     close(fd);
     if (n != nbytes) {
-        printf("CopyQspiToFpga: attempted to read %d bytes, but read returned %d\n",
-               nbytes, n);
-        free(data);
+        std::cout << "CopyQspiToFpga: attempted to read " << nbytes << " bytes, but read returned "
+                  << n << std::endl;
         return false;
     }
-    EMIO_WritePromData(emio, data, nbytes);
-    free(data);
+    emio->WritePromData(data, nbytes);
+    delete [] data;
     return true;
 }
 
 int main(int argc, char **argv)
 {
-    printf("*** FPGAV3 Initialization ***\n\n");
+    std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
 
     // Get FPGA Serial Number
     char fpga_sn[FPGA_SN_SIZE];
     GetFpgaSerialNumber(fpga_sn);
     if (fpga_sn[0])
-        printf("FPGA S/N: %s\n", fpga_sn);
+        std::cout << "FPGA S/N: " << fpga_sn << std::endl;
 
     uint32_t reg_hw, reg_status, reg_ethctrl;
-    struct EMIO_Info *emio = EMIO_Init();
-    if (!emio)
+    EMIO_Interface_Gpiod emio;
+    if (!emio.IsOK())
         return -1;
 
-    EMIO_ReadQuadlet(emio, 4, &reg_hw);
-    EMIO_ReadQuadlet(emio, 0, &reg_status);
+    emio.ReadQuadlet(4, reg_hw);
+    emio.ReadQuadlet(0, reg_status);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
@@ -312,19 +306,19 @@ int main(int argc, char **argv)
     hwStr[3] = (reg_hw & 0x000000ff);
     hwStr[4] = 0;
     if (strcmp(hwStr, "BCFG") != 0) {
-        printf("fpgav3init: did not detect BCFG firmware, exiting\n");
-        EMIO_Release(emio);
+        std::cout << "fpgav3init: did not detect BCFG firmware, exiting" << std::endl;
         return -1;
     }
-    printf("Hardware version: %s\n", hwStr);
-    printf("Status reg: %08x\n", reg_status);
+    std::cout << "Hardware version: " << hwStr << std::endl;
+    std::cout << "Status reg: " << std::hex << std::setw(8) << std::setfill('0')
+              << reg_status << std::dec << std::endl;
     unsigned int board_id = (reg_status&0x0f000000)>>24;
     // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC
     unsigned int board_mask = (reg_status & 0x00f00000)>>20;
     bool isV30 = (reg_status&0x00080000);
 
     if (isV30)
-        printf("FPGA V3.0 detected!\n");
+        std::cout << "FPGA V3.0 detected!" << std::endl;
 
     enum BoardType board_type;
     switch (board_mask) {
@@ -339,11 +333,11 @@ int main(int argc, char **argv)
         default:
                 board_type = BOARD_UNKNOWN;
     }
-    printf("Board type: %s\n", BoardName[board_type]);
+    std::cout << "Board type: " << BoardName[board_type] << std::endl;
 
-    printf("Board ID: %d\n\n", board_id);
+    std::cout << "Board ID: " << board_id << std::endl << std::endl;
 
-    printf("Exporting FPGAV3 environment variables\n");
+    std::cout << "Exporting FPGAV3 environment variables" << std::endl;
     char fpga_ver[4];
     fpga_ver[0] = '3';
     fpga_ver[1] = '.';
@@ -358,25 +352,23 @@ int main(int argc, char **argv)
 
     ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
 
-    printf("\nEnabling PS Ethernet\n");
+    std::cout << std::endl << "Enabling PS Ethernet" << std::endl;
     // Bit 25: mask for PS Ethernet enable
     // Bit 16: enable PS eth (Rev 9)
     // Bit  8: enable eth1 (Rev 8)
     // Bit  0: enable eth0 (Rev 8)
     reg_ethctrl = 0x02010101;
-    EMIO_WriteQuadlet(emio, 12, reg_ethctrl);
+    emio.WriteQuadlet(12, reg_ethctrl);
 
-    printf("Setting Ethernet MAC and IP addresses\n");
+    std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
     if (!SetMACandIP("eth0", 0, board_id))
-        printf("Failed to set MAC or IP address for eth0\n");
+        std::cout << "Failed to set MAC or IP address for eth0" << std::endl;
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers
-    printf("Writing FPGA S/N to FPGA\n\n");
-    CopyQspiToFpga("/dev/mtd4ro", emio, 16);
+    std::cout << "Writing FPGA S/N to FPGA" << std::endl << std::endl;
+    CopyQspiToFpga("/dev/mtd4ro", &emio, 16);
 
-    EMIO_Release(emio);
-
-    printf("*** FPGAV3 Initialization Complete ***\n\n");
+    std::cout << "*** FPGAV3 Initialization Complete ***" << std::endl << std::endl;
     return 0;
 }

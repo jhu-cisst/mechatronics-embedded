@@ -1,7 +1,7 @@
 
 
-SRCS = fpgav3_emio.c fpgav3_qspi.c
-OBJS = fpgav3_emio.o fpgav3_qspi.o
+SRCS = fpgav3_emio.cpp fpgav3_emio_gpiod.cpp fpgav3_qspi.cpp
+OBJS = fpgav3_emio.o fpgav3_emio_gpiod.o fpgav3_qspi.o
 
 VERSION = 1.0
 

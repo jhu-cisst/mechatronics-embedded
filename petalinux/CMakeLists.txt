@@ -33,6 +33,8 @@ petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
 
 set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.cpp"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.h"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/Makefile")

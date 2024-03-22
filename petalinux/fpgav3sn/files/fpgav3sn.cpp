@@ -5,7 +5,7 @@
  * Application to query/program FPGA V3 serial number in QSPI partition
  */
 
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -18,7 +18,7 @@ int main(int argc, char **argv)
         char fpga_sn[FPGA_SN_SIZE];
         GetFpgaSerialNumber(fpga_sn);
         if (fpga_sn[0])
-            printf("%s\n", fpga_sn);
+            std::cout << fpga_sn << std::endl;
     }
     else if ((argc > 2) && (argv[1][0] == '-') && (argv[1][1] == 'p')) {
         // -p sn (2 arguments): program serial number
@@ -27,8 +27,8 @@ int main(int argc, char **argv)
     }
     else {
         // Anything else: print help information
-        printf("Syntax: fpgav3sn [-p sn]\n");
-        printf("  Read or program (-p option) FPGA V3 serial number\n");
+        std::cout << "Syntax: fpgav3sn [-p sn]" << std::endl
+                  << "  Read or program (-p option) FPGA V3 serial number" << std::endl;
     }
     return 0;
 }
