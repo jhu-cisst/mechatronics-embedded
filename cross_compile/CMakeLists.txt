@@ -19,6 +19,10 @@ endif ()
 # Build the library
 set (LIBFPGAV3_SOURCE "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.cpp"
                       "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
+                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.cpp"
+                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.h"
+                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.cpp"
+                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.h"
                       "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
                       "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h")
 

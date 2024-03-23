@@ -95,6 +95,10 @@ if (USE_PETALINUX_SYSROOT)
   # Additional source files
   set (LIBFPGAV3_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.h"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpio.cpp"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpio.h"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_mmap.cpp"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_mmap.h"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.h")
 

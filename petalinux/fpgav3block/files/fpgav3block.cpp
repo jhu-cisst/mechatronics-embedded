@@ -16,6 +16,7 @@
 #include <string.h>
 #include <byteswap.h>
 #include <fpgav3_emio_gpiod.h>
+#include <fpgav3_emio_mmap.h>
 
 int main(int argc, char **argv)
 {
@@ -28,6 +29,7 @@ int main(int argc, char **argv)
 
     bool isQuad = (strstr(argv[0], "fpgav3quad") != 0);
     bool isVerbose = false;
+    bool useMmap = false;
     unsigned int eventMode = 2;
     unsigned int timingMode = 0;
 
@@ -38,6 +40,9 @@ int main(int argc, char **argv)
         if (argv[i][0] == '-') {
             if (argv[i][1] == 'v') {
                 isVerbose = true;
+            }
+            else if (argv[i][1] == 'm') {
+                useMmap = true;
             }
             else if (argv[i][1] == 't') {
                 if (argv[i][2]) timingMode = argv[i][2]-'0';
@@ -67,48 +72,60 @@ int main(int argc, char **argv)
     }
 
     if (args_found < 1) {
-        std::cout << "Usage: " << argv[0] << " [-v] [-e<n>] [-t<n>] <address in hex> ";
+        std::cout << "Usage: " << argv[0] << " [-v] [-m] [-e<n>] [-t<n>] <address in hex> ";
         if (isQuad)
             std::cout << "[value to write in hex]" << std::endl;
         else
             std::cout << "<address in hex> <number of quadlets> [write data quadlets in hex]" << std::endl;
         std::cout << "       where -v is for verbose output" << std::endl
+                  << "             -m specifies to use mmap interface" << std::endl
                   << "             -e<n> is to use polling (0) or events (1)" << std::endl
                   << "             -t<n> is for timing measurement: 0 (no timing), 1 (total time only), 2+ (all timing)"
                   << std::endl;
         return 0;
     }
 
-    EMIO_Interface_Gpiod emio;
-    if (!emio.IsOK()) {
+    EMIO_Interface *emio;
+    if (useMmap) {
+        if (isVerbose)
+            std::cout << "Using EMIO mmap interface" << std::endl;
+        emio = new EMIO_Interface_Mmap;
+    }
+    else {
+        if (isVerbose)
+            std::cout << "Using EMIO gpiod interface" << std::endl;
+        emio = new EMIO_Interface_Gpiod;
+    }
+    if (!emio->IsOK()) {
         std::cout << "Error initializing EMIO bus interface" << std::endl;
         return -1;
     }
 
-    emio.SetVerbose(isVerbose);
+    emio->SetVerbose(isVerbose);
 
     bool defaultEventMode = true;
     if (eventMode == 0) {
-        emio.SetEventMode(false);
+        emio->SetEventMode(false);
         defaultEventMode = false;
     }
     else if (eventMode == 1) {
-        emio.SetEventMode(true);
+        emio->SetEventMode(true);
         defaultEventMode = false;
     }
 
-    emio.SetTimingMode(timingMode);
+    emio->SetTimingMode(timingMode);
 
     if (isVerbose) {
-        std::cout << "GPIOD library version " << EMIO_gpiod_version_string() << std::endl;
-        std::cout << "EMIO bus interface version " << emio.GetVersion() << std::endl;
-        if (emio.GetEventMode())
+        if (!useMmap)
+            std::cout << "GPIOD library version " << EMIO_gpiod_version_string() << std::endl;
+        std::cout << "EMIO bus interface version " << emio->GetVersion() << std::endl;
+        if (emio->GetEventMode())
             std::cout << "Configured to use events";
         else
             std::cout << "Configured to use polling";
         if (defaultEventMode) std::cout << " (default)";
         std::cout << std::endl;
-        std::cout << "EMIO timeout is " << emio.GetTimeout_us() << " us" << std::endl;
+        std::cout << "EMIO timeout is " << emio->GetTimeout_us() << " us" << std::endl;
     }
 
     // Determine whether to read or write based on args_found
@@ -117,11 +134,11 @@ int main(int argc, char **argv)
     {
         // Read the data and print out the values (if no error)
         if (num == 1) {
-            if (emio.ReadQuadlet(addr, data1))
+            if (emio->ReadQuadlet(addr, data1))
                 std::cout << "0x" << std::hex << std::setw(8) << std::setfill('0') << data1 << std::endl;
         }
         else if (num > 1) {
-            if (emio.ReadBlock(addr, data, 4*num)) {
+            if (emio->ReadBlock(addr, data, 4*num)) {
                 for (j = 0; j < num; j++)
                     std::cout << "0x" << std::hex << std::setw(8) << std::setfill('0') << bswap_32(data[j]) << std::endl;
             }
@@ -132,14 +149,15 @@ int main(int argc, char **argv)
         bool ret = false;
         if (num == 1) {
             if (!isQuad) data1 = data[0];
-            ret = emio.WriteQuadlet(addr, data1);
+            ret = emio->WriteQuadlet(addr, data1);
         }
         else if (num > 1)
-            ret = emio.WriteBlock(addr, data, 4*num);
+            ret = emio->WriteBlock(addr, data, 4*num);
         if (!ret)
             std::cout << "Write failed" << std::endl;
     }
 
     delete [] data;
+    delete emio;
     return 0;
 }

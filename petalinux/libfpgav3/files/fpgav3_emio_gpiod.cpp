@@ -45,7 +45,6 @@ EMIO_Interface_Gpiod::EMIO_Interface_Gpiod() : EMIO_Interface()
     }
 }
 
-
 bool EMIO_Interface_Gpiod::Init()
 {
     unsigned int version_offsets[4];
@@ -426,7 +425,7 @@ bool EMIO_Interface_Gpiod::WriteQuadlet(uint16_t addr, uint32_t data)
     bool ret = WaitOpDone("write", 0);
 
     // Get time after wait
-    if (ret && doTiming > 1)
+    if (ret && (doTiming > 1))
         GetCurTime(&afterWait);
 
     // Set req_bus (and other ctrl lines) to 0
@@ -463,6 +462,11 @@ bool EMIO_Interface_Gpiod::ReadBlock(uint16_t addr, uint32_t *data, unsigned int
     // For timing measurements
     fpgav3_time_t firstRead;
     fpgav3_time_t lastRead;
+
+    if (version < 1) {
+        std::cout << "ReadBlock (gpiod): not supported for version " << version << std::endl;
+        return false;
+    }
 
     // Get start time for measurement
     if (doTiming > 0)
@@ -605,6 +609,11 @@ bool EMIO_Interface_Gpiod::WriteBlock(uint16_t addr, const uint32_t *data, unsig
     fpgav3_time_t lastWrite;
 
     unsigned int nQuads = (nBytes+3)/4;
+
+    if (version < 1) {
+        std::cout << "WriteBlock (gpiod): not supported for version " << version << std::endl;
+        return false;
+    }
 
     // Get start time for measurement
     if (doTiming > 0)

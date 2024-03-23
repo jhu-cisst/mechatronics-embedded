@@ -13,6 +13,8 @@ SRC_URI = "file://fpgav3_emio.h \
            file://fpgav3_emio.cpp \
            file://fpgav3_emio_gpiod.h \
            file://fpgav3_emio_gpiod.cpp \
+           file://fpgav3_emio_mmap.h \
+           file://fpgav3_emio_mmap.cpp \
            file://fpgav3_qspi.h \
            file://fpgav3_qspi.cpp \
 	   file://Makefile \
