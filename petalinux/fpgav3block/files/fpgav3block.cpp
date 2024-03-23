@@ -60,7 +60,7 @@ int main(int argc, char **argv)
                 num = strtoul(argv[i], 0, 10);
                 // Allocate data array, initializing contents to 0
                 data = new uint32_t[num];
-                memset(data, 0, sizeof(data));
+                memset(data, 0, num*sizeof(uint32_t));
             }
             else if (!isQuad && (j < num))
                 data[j++] = bswap_32(strtoul(argv[i], 0, 16));

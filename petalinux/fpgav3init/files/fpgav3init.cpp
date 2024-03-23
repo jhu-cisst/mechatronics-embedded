@@ -36,8 +36,8 @@
 
 // Detected board type
 enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
-char *BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
-char *FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
+std::string BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
+std::string FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
 
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
@@ -71,24 +71,22 @@ bool CopyFile(const std::string &filename, const std::string &srcDir, const std:
     return true;
 }
 
-bool ConvertBitstream(const char *firmwareName, const std::string &fileDir)
+bool ConvertBitstream(const std::string &firmwareName, const std::string &fileDir)
 {
-    char bifFile[40];
-    char bitFile[40];
     char sysCmd[128];
 
-    sprintf(bifFile, "%s/%s.bif", fileDir.c_str(), firmwareName);
-    FILE *fp = fopen(bifFile, "w");
+    std::string bifFile(fileDir + "/" + firmwareName + ".bif");
+    FILE *fp = fopen(bifFile.c_str(), "w");
     if (fp == NULL) {
-        printf("Error opening %s\n", bifFile);
+        std::cout << "Error opening " << bifFile << std::endl;
         return false;
     }
 
-    sprintf(bitFile, "%s/%s.bit", fileDir.c_str(), firmwareName);
-    fprintf(fp, "all:\n{\n    %s\n}\n", bitFile);
+    std::string bitFile(fileDir + "/" + firmwareName + ".bit");
+    fprintf(fp, "all:\n{\n    %s\n}\n", bitFile.c_str());
     fclose(fp);
 
-    sprintf(sysCmd, "bootgen -image %s -arch zynq -w on -process_bitstream bin", bifFile);
+    sprintf(sysCmd, "bootgen -image %s -arch zynq -w on -process_bitstream bin", bifFile.c_str());
     int ret = system(sysCmd);
     if (ret != 0)
         std::cout << "bootgen failed, return code " << ret << std::endl;
@@ -130,11 +128,10 @@ bool FpgaLoad(const std::string &binFile)
     return true;
 }
 
-bool ProgramFpga(const char *firmwareName)
+bool ProgramFpga(const std::string &firmwareName)
 {
     // Copy bit file from /media to /tmp
-    char bitFile[32];
-    sprintf(bitFile, "%s.bit", firmwareName);
+    std::string bitFile(firmwareName + ".bit");
     if (!CopyFile(bitFile, "/media", "/tmp"))
         return false;
 
@@ -159,8 +156,7 @@ bool ProgramFpga(const char *firmwareName)
 
     // Copy bin file from /tmp to /lib/firmware (FPGA Manager requires firmware
     // to be in /lib/firmware)
-    char binFile[36];
-    sprintf(binFile, "%s.bin", bitFile);
+    std::string binFile(bitFile + ".bin");
     CopyFile(binFile, "/tmp", "/lib/firmware");
 
     std::cout << "Loading bitstream to FPGA" << std::endl;
@@ -168,7 +164,7 @@ bool ProgramFpga(const char *firmwareName)
 }
 
 // Export FPGA information as shell variables
-bool ExportFpgaInfo(char *fpga_ver, char *fpga_sn, char *board_type, unsigned int board_id)
+bool ExportFpgaInfo(const char *fpga_ver, const char *fpga_sn, const char *board_type, unsigned int board_id)
 {
     mode_t mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
     int fd = open("/etc/profile.d/fpgav3.sh", O_WRONLY|O_CREAT|O_TRUNC, mode);
@@ -343,11 +339,11 @@ int main(int argc, char **argv)
     fpga_ver[1] = '.';
     fpga_ver[2] = isV30 ? '0' : '1';
     fpga_ver[3] = '\0';
-    ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type], board_id);
+    ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type].c_str(), board_id);
 
     // MicroSD card should be auto-mounted
 
-    if (strlen(FirmwareName[board_type]) > 0)
+    if (!FirmwareName[board_type].empty())
         ProgramFpga(FirmwareName[board_type]);
 
     ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");

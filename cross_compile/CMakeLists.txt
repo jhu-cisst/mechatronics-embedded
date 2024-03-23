@@ -16,15 +16,21 @@ if (NOT Arch STREQUAL "arm32")
   message(SEND_ERROR "Cross-compilation not properly initialized (Arch not set to arm32)")
 endif ()
 
+set (LIBFPGAV3_SOURCE_DIR "${PETALINUX_SOURCE_DIR}/libfpgav3/files")
+
+# Set include_directories so that most recent header files are available, rather than
+# relying on sysroot
+include_directories (${LIBFPGAV3_SOURCE_DIR})
+
 # Build the library
-set (LIBFPGAV3_SOURCE "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.cpp"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.cpp"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.h"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.cpp"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.h"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
-                      "${PETALINUX_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h")
+set (LIBFPGAV3_SOURCE "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio.cpp"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio.h"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_gpiod.cpp"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_gpiod.h"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_mmap.cpp"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_mmap.h"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_qspi.cpp"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_qspi.h")
 
 add_library (fpgav3 SHARED ${LIBFPGAV3_SOURCE})
 
