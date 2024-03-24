@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
     bool isQuad = (strstr(argv[0], "fpgav3quad") != 0);
     bool isVerbose = false;
-    bool useMmap = false;
+    bool useGpiod = false;
     unsigned int eventMode = 2;
     unsigned int timingMode = 0;
 
@@ -41,8 +41,8 @@ int main(int argc, char **argv)
             if (argv[i][1] == 'v') {
                 isVerbose = true;
             }
-            else if (argv[i][1] == 'm') {
-                useMmap = true;
+            else if (argv[i][1] == 'g') {
+                useGpiod = true;
             }
             else if (argv[i][1] == 't') {
                 if (argv[i][2]) timingMode = argv[i][2]-'0';
@@ -72,13 +72,13 @@ int main(int argc, char **argv)
     }
 
     if (args_found < 1) {
-        std::cout << "Usage: " << argv[0] << " [-v] [-m] [-e<n>] [-t<n>] <address in hex> ";
+        std::cout << "Usage: " << argv[0] << " [-v] [-g] [-e<n>] [-t<n>] <address in hex> ";
         if (isQuad)
             std::cout << "[value to write in hex]" << std::endl;
         else
             std::cout << "<address in hex> <number of quadlets> [write data quadlets in hex]" << std::endl;
         std::cout << "       where -v is for verbose output" << std::endl
-                  << "             -m specifies to use mmap interface" << std::endl
+                  << "             -g specifies to use gpiod interface" << std::endl
                   << "             -e<n> is to use polling (0) or events (1)" << std::endl
                   << "             -t<n> is for timing measurement: 0 (no timing), 1 (total time only), 2+ (all timing)"
                   << std::endl;
@@ -86,15 +86,15 @@ int main(int argc, char **argv)
     }
 
     EMIO_Interface *emio;
-    if (useMmap) {
-        if (isVerbose)
-            std::cout << "Using EMIO mmap interface" << std::endl;
-        emio = new EMIO_Interface_Mmap;
-    }
-    else {
+    if (useGpiod) {
         if (isVerbose)
             std::cout << "Using EMIO gpiod interface" << std::endl;
         emio = new EMIO_Interface_Gpiod;
+    }
+    else {
+        if (isVerbose)
+            std::cout << "Using EMIO mmap interface" << std::endl;
+        emio = new EMIO_Interface_Mmap;
     }
     if (!emio->IsOK()) {
         std::cout << "Error initializing EMIO bus interface" << std::endl;
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
     emio->SetTimingMode(timingMode);
 
     if (isVerbose) {
-        if (!useMmap)
+        if (useGpiod)
             std::cout << "GPIOD library version " << EMIO_gpiod_version_string() << std::endl;
         std::cout << "EMIO bus interface version " << emio->GetVersion() << std::endl;
         if (emio->GetEventMode())
