@@ -370,8 +370,7 @@ bool EMIO_Interface_Mmap::ReadBlock(uint16_t addr, uint32_t *data, unsigned int 
 
         // Read data from reg_data
         val = RegisterRead(Reg_InputLower);
-        // data[q] = bswap_32(val);
-        data[q] = val;
+        data[q] = bswap_32(val);
     }
 
     if (doTiming > 1)
@@ -435,8 +434,7 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
     for (q = 0; q < nQuads; q++) {
 
         // Write data
-        // val = bswap_32(data[q]);
-        val = data[q];
+        val = bswap_32(data[q]);
         RegisterWrite(Reg_OutputLower, val);
 
         if (q == nQuads-1) {
