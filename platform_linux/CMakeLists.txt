@@ -54,6 +54,7 @@ if (USE_PETALINUX_SYSROOT)
         APP_NAME       ${FPGAV3INIT_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
         TEMPLATE_NAME  "Empty Application (C++)"
+        LANGUAGE       "c++"
         ADD_SOURCE     ${FPGAV3INIT_SOURCE}
         LIBRARIES      "fpgav3"
         BUILD_CONFIG   "Release"
@@ -69,6 +70,7 @@ if (USE_PETALINUX_SYSROOT)
         APP_NAME       ${FPGAV3INIT_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
         TEMPLATE_NAME  "Empty Application (C++)"
+        LANGUAGE       "c++"
         ADD_SOURCE     ${FPGAV3INIT_SOURCE}
         LIBRARIES      "fpgav3"
         BUILD_CONFIG   "Release")
@@ -95,8 +97,8 @@ if (USE_PETALINUX_SYSROOT)
   # Additional source files
   set (LIBFPGAV3_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio.h"
-                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpio.cpp"
-                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpio.h"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpiod.cpp"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_gpiod.h"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_mmap.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_mmap.h"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.cpp"
@@ -110,6 +112,7 @@ if (USE_PETALINUX_SYSROOT)
         LIB_NAME       ${LIBFPGAV3_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
         LIB_TYPE       "shared"
+        LANGUAGE       "c++"
         ADD_SOURCE     ${LIBFPGAV3_SOURCE}
         LIBRARIES      "gpiod"
         BUILD_CONFIG   "Release"
@@ -125,6 +128,7 @@ if (USE_PETALINUX_SYSROOT)
         LIB_NAME       ${LIBFPGAV3_NAME}
         PLATFORM_NAME  ${PLATFORM_LINUX}
         LIB_TYPE       "shared"
+        LANGUAGE       "c++"
         ADD_SOURCE     ${LIBFPGAV3_SOURCE}
         LIBRARIES      "gpiod"
         BUILD_CONFIG   "Release")

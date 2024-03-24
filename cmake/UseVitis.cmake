@@ -42,6 +42,7 @@
 #   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
 #   - TEMPLATE_NAME   Name of Vitis application template (APP only)
 #   - LIB_TYPE        Library type (static or shared) (LIBRARY only)
+#   - LANGUAGE        Language (optional, c or c++, default is c)
 #   - ADD_SOURCE      Additional source files (optional)
 #   - DEL_SOURCE      Source files to delete (optional, APP only)
 #   - TARGET_LIBS     Library targets (optional, APP only)
@@ -56,8 +57,10 @@
 #   Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
 #   causes that compiler option to be removed.
 #
-#   TEMPLATE_NAME can be "Empty Application (C++)", "Linux Empty Application",
-#   or "Linux Hello World", where the latter two use C.
+#   TEMPLATE_NAME can be anything returned by xsct command "repo -apps", including:
+#       linux (C programs): "Linux Empty Application", "Linux Hello World"
+#       standalone: "Zynq FSBL", "lwIP Echo Server", "Hello World", "Empty Application(C)"
+#       If LANGUAGE is c++, then it should be "Empty Application (C++)"
 #
 #   The optional DEPENDENCIES parameter can specify additional dependencies, beyond
 #   the assumed dependency on TARGET_LIBS.
@@ -207,6 +210,7 @@ function (vitis_create OBJECT_TYPE ...)
        PLATFORM_NAME
        TEMPLATE_NAME
        LIB_TYPE
+       LANGUAGE
        ADD_SOURCE
        DEL_SOURCE
        TARGET_LIBS
@@ -314,10 +318,17 @@ function (vitis_create OBJECT_TYPE ...)
     file (APPEND ${TCL_CREATE} "  if { [catch {${XSCT_CMD} remove ${OBJECT_NAME}} errMsg ]} {\n")
     file (APPEND ${TCL_CREATE} "    puts stderr \"${XSCT_CMD} remove: $errMsg\"\n  }\n}\n")
     # Create app or library, using active platform (and domain); also creates sysproj ${OBJECT_NAME}_system
-    if (XSCT_CMD STREQUAL "app")
-      file (APPEND ${TCL_CREATE} "app create -name ${OBJECT_NAME} -template {${TEMPLATE_NAME}}\n")
+    # If LANGUAGE is specified, also set that (note that it can be specified for app or library, even though
+    # Xilinx documentation does not mention it for library).
+    if (LANGUAGE)
+      set (LANG_OPTION "-lang {${LANGUAGE}}")
     else ()
-      file (APPEND ${TCL_CREATE} "library create -name ${OBJECT_NAME} -type ${LIB_TYPE}\n")
+      set (LANG_OPTION "")
+    endif ()
+    if (XSCT_CMD STREQUAL "app")
+      file (APPEND ${TCL_CREATE} "app create -name ${OBJECT_NAME} -template {${TEMPLATE_NAME}} ${LANG_OPTION}\n")
+    else ()
+      file (APPEND ${TCL_CREATE} "library create -name ${OBJECT_NAME} -type ${LIB_TYPE} ${LANG_OPTION}\n")
     endif ()
     # Set build configuration (i.e., Release or Debug)
     file (APPEND ${TCL_CREATE} "if { [catch {${XSCT_CMD} config -name ${OBJECT_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
