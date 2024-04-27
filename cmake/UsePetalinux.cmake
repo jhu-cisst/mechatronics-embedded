@@ -488,12 +488,6 @@ function (petalinux_build ...)
     set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
     set (PETALINUX_FSBL_FILE  "${PETALINUX_IMAGE_DIR}/zynq_fsbl.elf")
     set (PETALINUX_UBOOT_FILE "${PETALINUX_IMAGE_DIR}/u-boot.elf")
-    if (FSBL_FILE)
-      set (MSG_FSBL "custom FSBL")
-    else ()
-      set (FSBL_FILE ${PETALINUX_FSBL_FILE})
-      set (MSG_FSBL "default FSBL")
-    endif ()
 
     add_custom_command (
         OUTPUT ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE}
@@ -509,6 +503,12 @@ function (petalinux_build ...)
         DEPENDS ${PETALINUX_ROOTFS_OUTPUT} ${DEPENDENCIES})
 
     # Package the boot files
+    if (FSBL_FILE)
+      set (MSG_FSBL "custom FSBL")
+    else ()
+      set (FSBL_FILE ${PETALINUX_FSBL_FILE})
+      set (MSG_FSBL "default FSBL")
+    endif ()
 
     # Output of petalinux-package
     set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
@@ -517,20 +517,20 @@ function (petalinux_build ...)
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE} --fpga ${BIT_FILE}
+          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE} --fpga ${BIT_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
           COMMENT "Petalinux package (boot image), ${MSG_FSBL}"
-          DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
+          DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
     else ()
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE}
+          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
           COMMENT "Petalinux package (boot image) without BIT file, ${MSG_FSBL}"
                 "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs"
-          DEPENDS ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
+          DEPENDS ${PETALINUX_IMAGE_UB} ${FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
     endif ()
 

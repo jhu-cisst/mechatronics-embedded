@@ -41,9 +41,11 @@
 
 // Defined in qspi.c
 const u8 READ_ID_CMD = 0x9F;
-const u8 READ_ID_SIZE = 4;          /* Read ID command + 3 bytes ID response */
+const u8 READ_STATUS_REG2 = 0x35;
+const u8 WRITE_STATUS_REG2 = 0x31;
+const u8 QE_BIT_MASK = 0x02;
+
 const u8 WRITE_ENABLE_CMD = 0x06;
-const u8 WRITE_ENABLE_CMD_SIZE = 1; /* WE command */
 
 /************************** Function Prototypes ******************************/
 
@@ -167,6 +169,7 @@ bool FpgaV3_Init_SD()
 {
     XQspiPs QspiInstance;
     XQspiPs_Config *QspiConfig;
+    u32 ret;
     u8 ReadBuffer[4];
     u8 WriteBuffer[4];
 
@@ -197,7 +200,7 @@ bool FpgaV3_Init_SD()
     WriteBuffer[2] = 0x00;
     WriteBuffer[3] = 0x00;
 
-    u32 ret = XQspiPs_PolledTransfer(&QspiInstance, WriteBuffer, ReadBuffer, READ_ID_SIZE);
+    ret = XQspiPs_PolledTransfer(&QspiInstance, WriteBuffer, ReadBuffer, 4);
     if (ret != XST_SUCCESS) {
         xil_printf("Failed to read QSPI Flash ID\r\n");
         return false;
@@ -205,15 +208,62 @@ bool FpgaV3_Init_SD()
 
     if (ReadBuffer[1] == WINBOND_ID) {
         xil_printf("QSPI: WINBOND ");
-        if (ReadBuffer[2] == 0x70)
-            xil_printf("M ");
-        if (ReadBuffer[3] == 0x18)
-            xil_printf("128MBits\r\n");
-        else
+        if (ReadBuffer[3] == 0x18) {
+            if (ReadBuffer[2] == 0x40) {
+                xil_printf("W25Q128JV\r\n");
+            }
+            else if (ReadBuffer[2] == 0x70) {
+                xil_printf("W25Q128JV-M\r\n");
+            }
+            else {
+                xil_printf("Unexpected device id (%x)\r\n", ReadBuffer[2]);
+                return false;
+            }
+        }
+        else {
             xil_printf("Unexpected size (%x)\r\n", ReadBuffer[3]);
+            return false;
+        }
     }
     else {
         xil_printf("Unexpected QSPI Flash ID (%x)\r\n", ReadBuffer[1]);
+        return false;
+    }
+
+    // Now, check the Quad Enable (QE) bit in Status Register 2. This should be 1,
+    // but for the W25Q128JV-M, it is factory programmed to 0.
+    // If the bit is 0, we program it to 1.
+    WriteBuffer[0] = READ_STATUS_REG2;
+    WriteBuffer[1] = 0x00;
+
+    ret = XQspiPs_PolledTransfer(&QspiInstance, WriteBuffer, ReadBuffer, 2);
+    if (ret != XST_SUCCESS) {
+        xil_printf("Failed to read QSPI Status Register 2\r\n");
+        return false;
+    }
+
+    if (ReadBuffer[1] & QE_BIT_MASK) {
+        xil_printf("QE bit set\r\n");
+    }
+    else {
+        xil_printf("Programming QE bit\r\n");
+        // Set Write Enable (WE)
+        WriteBuffer[0] = WRITE_ENABLE_CMD;
+        ret = XQspiPs_PolledTransfer(&QspiInstance, WriteBuffer, ReadBuffer, 1);
+        if (ret != XST_SUCCESS) {
+            xil_printf("Failed to Write Enable QSPI\r\n");
+            return false;
+        }
+        // Write to Status Register 2
+        WriteBuffer[0] = WRITE_STATUS_REG2;
+        WriteBuffer[1] = ReadBuffer[1] | QE_BIT_MASK;
+        ret = XQspiPs_PolledTransfer(&QspiInstance, WriteBuffer, ReadBuffer, 2);
+        if (ret != XST_SUCCESS) {
+            xil_printf("Failed to write QSPI Status Register 2\r\n");
+            return false;
+        }
+        // Should wait for BUSY bit to be cleared, but since we are not going to access
+        // QSPI for awhile (e.g., until Linux boots), it should be fine to skip it.
     }
 
     return true;
