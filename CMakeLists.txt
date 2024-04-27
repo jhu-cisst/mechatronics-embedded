@@ -149,6 +149,8 @@ elseif (USE_VITIS OR USE_PETALINUX)
 
 endif ()
 
+set (VITIS_FSBL_TARGET "")
+
 if (USE_VITIS)
 
   find_package(Vitis)
@@ -163,6 +165,8 @@ if (USE_VITIS)
 
       set (Xilinx_VERSION ${Vitis_VERSION})
       include(${VITIS_USE_FILE})
+
+      set (VITIS_FSBL_TARGET "zynq_fsbl")
 
       add_subdirectory (platform_standalone)
 

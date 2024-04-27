@@ -51,7 +51,7 @@ vitis_create (LIBRARY
 
 ############################ FSBL App #############################
 
-set (FSBL_NAME   "zynq_fsbl")
+set (FSBL_NAME   ${VITIS_FSBL_TARGET})
 set (FSBL_CONFIG "Release")
 
 # Additional source files

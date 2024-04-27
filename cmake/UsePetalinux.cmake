@@ -76,6 +76,8 @@
 #   - CONFIG_MENU        ON --> show config menus (default is OFF)
 #   - ROOTFS_CONFIG_SRC  Source rootfs_config
 #   - BIT_FILE           BIT file to use for boot image (optional)
+#   - FSBL_FILE          FSBL file (elf) to use for boot image (optional, default is
+#                        zynq_fsbl.elf in petalinux image directory)
 #   - DEPENDENCIES       Build dependencies
 #
 # Description:
@@ -421,6 +423,7 @@ function (petalinux_build ...)
        CONFIG_MENU
        ROOTFS_CONFIG_SRC
        BIT_FILE
+       FSBL_FILE
        DEPENDENCIES)
 
   # reset local variables
@@ -485,6 +488,12 @@ function (petalinux_build ...)
     set (PETALINUX_IMAGE_UB   "${PETALINUX_IMAGE_DIR}/image.ub")
     set (PETALINUX_FSBL_FILE  "${PETALINUX_IMAGE_DIR}/zynq_fsbl.elf")
     set (PETALINUX_UBOOT_FILE "${PETALINUX_IMAGE_DIR}/u-boot.elf")
+    if (FSBL_FILE)
+      set (MSG_FSBL "custom FSBL")
+    else ()
+      set (FSBL_FILE ${PETALINUX_FSBL_FILE})
+      set (MSG_FSBL "default FSBL")
+    endif ()
 
     add_custom_command (
         OUTPUT ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE}
@@ -510,7 +519,7 @@ function (petalinux_build ...)
           OUTPUT ${PETALINUX_BOOT_FILE}
           COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE} --fpga ${BIT_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
-          COMMENT "Petalinux package (boot image)"
+          COMMENT "Petalinux package (boot image), ${MSG_FSBL}"
           DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
     else ()
@@ -519,7 +528,7 @@ function (petalinux_build ...)
           OUTPUT ${PETALINUX_BOOT_FILE}
           COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
-          COMMENT "Petalinux package (boot image) without BIT file"
+          COMMENT "Petalinux package (boot image) without BIT file, ${MSG_FSBL}"
                 "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs"
           DEPENDS ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 

@@ -93,6 +93,14 @@ set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
                           "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND}
                           "fpgav3block" ${FPGAV3BLOCK_SOURCES}   ${FPGAV3BLOCK_BBAPPEND})
 
+if (VITIS_FSBL_TARGET)
+  get_property(FSBL_FILE TARGET ${VITIS_FSBL_TARGET} PROPERTY OUTPUT_NAME)
+  set (FSBL_OPTION  "FSBL_FILE" ${FSBL_FILE})
+  set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${FSBL_FILE})
+else ()
+  set (FSBL_OPTION "")
+endif ()
+
 set (PETALINUX_BUILD_TARGET "${PETALINUX_PROJ_NAME}_build")
 
 petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
@@ -100,6 +108,7 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  CONFIG_MENU         ${PETALINUX_MENU}
                  ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
+                 ${FSBL_OPTION}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
 
 # *************** Petalinux generated output: MicroSD and sysroot (SDK) *********************
