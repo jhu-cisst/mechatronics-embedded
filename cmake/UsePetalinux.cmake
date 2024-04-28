@@ -606,6 +606,8 @@ function (petalinux_build_sdk)
     add_custom_command (
         OUTPUT ${PETALINUX_SH_FILE}
         COMMAND petalinux-build --sdk
+        # Update file time, in case it was not regenerated
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${PETALINUX_SH_FILE}
         # Set WORKING_DIRECTORY to Petalinux project subdirectory
         WORKING_DIRECTORY ${PROJ_NAME}
         COMMENT "Building Petalinux SDK"
