@@ -77,6 +77,35 @@ else ()
 
 endif ()
 
+# ************************* Create fpgav3 version header file *******************************
+# Create the file fpgav3_version.h (FPGAV3_VERSION_HEADER), which is used in petalinux,
+# platform_linux and platform_standalone, when building the fpgav3 library. Note that
+# this introduces a dependency on the FpgaVersionFile target.
+
+set (VERSION_INPUT_FILE_SRC  "${CMAKE_CURRENT_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_version.h.in")
+set (VERSION_INPUT_FILE_BIN  "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h.in")
+set (VERSION_OUTPUT_FILE_NEW "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h.new")
+set (FPGAV3_VERSION_HEADER   "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h")
+
+configure_file (${VERSION_INPUT_FILE_SRC} ${VERSION_INPUT_FILE_BIN} @ONLY)
+
+add_custom_command (OUTPUT ${VERSION_OUTPUT_FILE_NEW}
+                    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                                             -DTAG_PREFIX="v"
+                                             -DIN_FILE=${VERSION_INPUT_FILE_BIN}
+                                             -DOUT_FILE=${VERSION_OUTPUT_FILE_NEW}
+                                             -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
+                     DEPENDS ${VERSION_INPUT_FILE_BIN})
+
+add_custom_target (FpgaVersionFile ALL
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_OUTPUT_FILE_NEW}
+                                                                 ${FPGAV3_VERSION_HEADER}
+                   COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_OUTPUT_FILE_NEW}
+                   COMMENT "Checking fpgav3_version.h"
+                   DEPENDS ${VERSION_OUTPUT_FILE_NEW})
+
+# *******************************************************************************************
+
 if (USE_VIVADO OR USE_VITIS OR USE_PETALINUX)
 
   option (BUILD_FPGAV30 "Build for FPGA V3.0 (instead of V3.1)" OFF)

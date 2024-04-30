@@ -282,8 +282,8 @@ int main(int argc, char **argv)
 {
     std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
 
-    // Display embedded software version (defined in fpgav3_version.h)
-    std::cout << "Embedded software version " << FPGAV3_VERSION;
+    // Display software version (defined in fpgav3_version.h)
+    std::cout << "Software Version " << FPGAV3_VERSION;
     if (strcmp(FPGAV3_GIT_VERSION, FPGAV3_VERSION) != 0)
         std::cout << " (git " << FPGAV3_GIT_VERSION << ")";
     std::cout << std::endl << std::endl;

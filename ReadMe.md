@@ -20,6 +20,14 @@ The top-level CMake file (CMakeLists.txt) in this directory contains options `US
 `USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
 option is only supported on Linux because the Xilinx Petalinux tool is only available on Linux.
 
+The current setup requires the software to be built from a git working tree (i.e., created by
+`git clone`) because it uses the `git` command line program to retrieve version information
+(i.e., using `git describe`).
+
+The CMake dependency checking is not perfect, so sometimes it is necessary to either start with
+a clean build tree, or to manually force certain subprojects to be rebuilt. Many subprojects create a
+`cmake.copy` file in the build tree and deleting this file will cause the subproject to be rebuilt.
+
 ## Build Process
 
 1. Use Vivado to create the Xilinx Support Archive (XSA) file, which describes the hardware design,

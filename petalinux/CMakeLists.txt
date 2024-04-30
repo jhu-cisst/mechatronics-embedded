@@ -29,30 +29,6 @@ petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
                   RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
 
-# ******************* fpgav3 version header file **************************
-
-set (VERSION_INPUT_FILE_SRC  "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_version.h.in")
-set (VERSION_INPUT_FILE_BIN  "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h.in")
-set (VERSION_OUTPUT_FILE_NEW "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h.new")
-set (VERSION_OUTPUT_FILE     "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version.h")
-
-configure_file (${VERSION_INPUT_FILE_SRC} ${VERSION_INPUT_FILE_BIN} @ONLY)
-
-add_custom_command (OUTPUT ${VERSION_OUTPUT_FILE_NEW}
-                    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-                                             -DTAG_PREFIX="v"
-                                             -DIN_FILE=${VERSION_INPUT_FILE_BIN}
-                                             -DOUT_FILE=${VERSION_OUTPUT_FILE_NEW}
-                                             -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
-                     DEPENDS ${VERSION_INPUT_FILE_BIN})
-
-add_custom_target (FpgaVersionFile ALL
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_OUTPUT_FILE_NEW}
-                                                                 ${VERSION_OUTPUT_FILE}
-                   COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_OUTPUT_FILE_NEW}
-                   COMMENT "Checking fpgav3_version.h"
-                   DEPENDS ${VERSION_OUTPUT_FILE_NEW})
-
 # ************************** fpgav3 library *******************************
 
 set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
@@ -63,7 +39,7 @@ set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
-                       ${VERSION_OUTPUT_FILE}
+                       ${FPGAV3_VERSION_HEADER}
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/Makefile")
 
 set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")

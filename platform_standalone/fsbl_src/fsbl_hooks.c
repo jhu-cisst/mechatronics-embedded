@@ -36,6 +36,7 @@
 #include "qspi.h"
 #include "xqspips.h"
 #include "fpgav3_emio.h"
+#include "fpgav3_version.h"
 
 /************************** Variable Definitions *****************************/
 
@@ -275,6 +276,12 @@ bool FpgaV3_Init_SD()
 bool FpgaV3_Init_QSPI()
 {
     xil_printf("\r\n*** FPGA V3 ***\r\n\n");
+
+    // Display software version (defined in fpgav3_version.h)
+    xil_printf("Software Version %s", FPGAV3_VERSION);
+    if (strcmp(FPGAV3_GIT_VERSION, FPGAV3_VERSION) != 0)
+        xil_printf(" (git %s)", FPGAV3_GIT_VERSION);
+    xil_printf("\r\n\n");
 
     // Initialize EMIO bus interface
     EMIO_Init();

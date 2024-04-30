@@ -39,7 +39,8 @@ set (FPGAV3LIB_TARGET "${FPGAV3LIB_NAME}lib")
 # Additional source files
 set (FPGAV3LIB_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.h"
-     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.c"
+     ${FPGAV3_VERSION_HEADER})
 
 vitis_create (LIBRARY
     TARGET_NAME    ${FPGAV3LIB_TARGET}
@@ -47,7 +48,8 @@ vitis_create (LIBRARY
     LIB_TYPE       "static"
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     ADD_SOURCE     ${FPGAV3LIB_SOURCE}
-    BUILD_CONFIG   "Release")
+    BUILD_CONFIG   "Release"
+    DEPENDENCIES   FpgaVersionFile)
 
 ############################ FSBL App #############################
 
