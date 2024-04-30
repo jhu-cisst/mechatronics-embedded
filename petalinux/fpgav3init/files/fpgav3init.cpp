@@ -33,6 +33,7 @@
 #include <arpa/inet.h>
 #include <fpgav3_emio_gpiod.h>
 #include <fpgav3_qspi.h>
+#include <fpgav3_version.h>
 
 // Detected board type
 enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
@@ -280,6 +281,12 @@ bool CopyQspiToFpga(const std::string &qspiDev, EMIO_Interface *emio, uint16_t n
 int main(int argc, char **argv)
 {
     std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
+
+    // Display embedded software version (defined in fpgav3_version.h)
+    std::cout << "Embedded software version " << FPGAV3_VERSION;
+    if (strcmp(FPGAV3_GIT_VERSION, FPGAV3_VERSION) != 0)
+        std::cout << " (git " << FPGAV3_GIT_VERSION << ")";
+    std::cout << std::endl << std::endl;
 
     // Get FPGA Serial Number
     char fpga_sn[FPGA_SN_SIZE];

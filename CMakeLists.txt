@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(FpgaBoard NONE)
 
+# The designated version; note that this may be different from the version indicated by git (see below)
 set (EMBEDDED_VERSION_MAJOR 1)
 set (EMBEDDED_VERSION_MINOR 1)
 set (EMBEDDED_VERSION_PATCH 0)
@@ -214,29 +215,53 @@ if (USE_PETALINUX)
 endif ()
 
 #
-# Write a simple mechatronics-embedded-config.cmake file
+# CMake config file: mechatronics-embedded-config.cmake
 #
-set (CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/mechatronics-embedded-config.cmake")
-file (WRITE  ${CONFIG_FILE} "#\n# CMake configuration file for mechatronics-embedded\n#\n\n")
-file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_MAJOR ${EMBEDDED_VERSION_MAJOR})\n")
-file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_MINOR ${EMBEDDED_VERSION_MINOR})\n")
-file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION_PATCH ${EMBEDDED_VERSION_PATCH})\n")
-file (APPEND ${CONFIG_FILE} "set (EMBEDDED_VERSION       \"${EMBEDDED_VERSION}\")\n\n")
+
+set (CONFIG_IN_FILE "${CMAKE_CURRENT_BINARY_DIR}/mechatronics-embedded-config.cmake.in")
+set (CONFIG_FILE    "${CMAKE_CURRENT_BINARY_DIR}/mechatronics-embedded-config.cmake")
+
+#
+# Create an initial mechatronics-embedded-config.cmake.in file, which is then updated
+# at build time using configure_file (see CreateVersions.cmake)
+#
+
+file (WRITE  ${CONFIG_IN_FILE} "#\n# CMake configuration file for mechatronics-embedded\n#\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_VERSION         \"${EMBEDDED_VERSION}\")\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_VERSION_MAJOR   ${EMBEDDED_VERSION_MAJOR})\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_VERSION_MINOR   ${EMBEDDED_VERSION_MINOR}\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_VERSION_PATCH   ${EMBEDDED_VERSION_PATCH})\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_VERSION     \"@GIT_VERSION@\")\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_VERSION_MAJOR   @GIT_VERSION_MAJOR@)\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_VERSION_MINOR   @GIT_VERSION_MINOR@)\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_VERSION_PATCH   @GIT_VERSION_PATCH@)\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_SHA     @GIT_SHA@)\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_COMMITS @GIT_COMMITS@)\n")
+file (APPEND ${CONFIG_IN_FILE} "set (EMBEDDED_GIT_DIRTY   @GIT_DIRTY@)\n\n")
 if (mechatronics-firmware_FOUND)
-  file (APPEND ${CONFIG_FILE} "set (FIRMWARE_VERSION ${FIRMWARE_VERSION})\n\n")
+  file (APPEND ${CONFIG_IN_FILE} "set (FIRMWARE_VERSION ${FIRMWARE_VERSION})\n\n")
 endif ()
 if (FPGA_VERSION)
-  file (APPEND ${CONFIG_FILE} "set (FPGA_VERSION     ${FPGA_VERSION})\n\n")
+  file (APPEND ${CONFIG_IN_FILE} "set (FPGA_VERSION     ${FPGA_VERSION})\n\n")
 endif ()
-file (APPEND ${CONFIG_FILE} "set (USE_VIVADO       ${USE_VIVADO})\n")
-file (APPEND ${CONFIG_FILE} "set (USE_VITIS        ${USE_VITIS})\n")
-file (APPEND ${CONFIG_FILE} "set (USE_PETALINUX    ${USE_PETALINUX})\n\n")
+file (APPEND ${CONFIG_IN_FILE} "set (USE_VIVADO       ${USE_VIVADO})\n")
+file (APPEND ${CONFIG_IN_FILE} "set (USE_VITIS        ${USE_VITIS})\n")
+file (APPEND ${CONFIG_IN_FILE} "set (USE_PETALINUX    ${USE_PETALINUX})\n\n")
 if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
-  file (APPEND ${CONFIG_FILE} "set (PETALINUX_SYSROOT      \"${PETALINUX_SYSROOT}\")\n\n")
+  file (APPEND ${CONFIG_IN_FILE} "set (PETALINUX_SYSROOT      \"${PETALINUX_SYSROOT}\")\n\n")
 endif ()
 if (Xilinx_VERSION)
-  file (APPEND ${CONFIG_FILE} "set (Xilinx_VERSION   ${Xilinx_VERSION})\n")
+  file (APPEND ${CONFIG_IN_FILE} "set (Xilinx_VERSION   ${Xilinx_VERSION})\n")
 endif ()
+
+add_custom_target (ConfigFile ALL
+                   COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                                            -DTAG_PREFIX="v"
+                                            -DIN_FILE=${CONFIG_IN_FILE}
+                                            -DOUT_FILE=${CONFIG_FILE}
+                                            -DCONFIG_OPTIONS="@ONLY"
+                                            -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
+                   COMMENT "Creating mechatronics-embedded-config.cmake")
 
 #
 # Mechatronics toolchain files for FPGA V3
