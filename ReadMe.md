@@ -95,9 +95,7 @@ Following are the dependencies on the Xilinx tool versions (2022.2, 2023.1):
 difference between the TCL files exported by 2022.2 and 2023.1, so the current solution is to replace the version string while copying the file from
 the source tree to the build tree. A different solution may be necessary if there are more substantive changes in future Vivado versions.
 
-* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.1). Furthermore,
-both library versions require a patch to the file `xemacpsif_physpeed.c` to handle the RTL8211F PHY. Other Vitis versions will attempt to use the
-2023.1 files, which may fail (e.g., if the lwip version is different).
+* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.1). Other Vitis versions will attempt to use the 2023.1 files, which may fail (e.g., if the lwip version is different).
 
 * **platform_linux (Vitis)**: no differences.
 

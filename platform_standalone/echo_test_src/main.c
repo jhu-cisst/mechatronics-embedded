@@ -49,14 +49,8 @@
 #endif
 #endif
 
-// JHU MOD: Added following extern
-extern char inbyte();
-
-// JHU MOD: Added following variable, instead of PLATFORM_EMAC_BASEADDR,
-//          which was defined (to XPAR_XEMACPS_0_BASEADDR) in platform_config.h.
-//          Note that xparameters.h defines XPAR_XEMACPS_0_BASEADDR to 0xE000B000
-//          and XPAR_XEMACPS_1_BASEADDR to 0xE000C000.
-UINTPTR ECHO_EMAC_BASEADDR = XPAR_XEMACPS_0_BASEADDR;
+// JHU MOD: Added following include
+#include "fpgav3_emio.h"
 
 /* defined by each RAW mode application */
 void print_app_header();
@@ -156,6 +150,19 @@ int main()
 
 	init_platform();
 
+	// JHU MOD: Added following to enable PS Ethernet and get board id.
+	// Initialize EMIO bus interface
+	EMIO_Init();
+	// Enable PS Ethernet
+	// Bit 25: mask for PS Ethernet enable
+	// Bit 16: enable PS eth (Rev 9)
+	EMIO_WriteQuadlet(12, 0x02010000);
+	uint32_t board_status;
+	EMIO_ReadQuadlet(0, &board_status);
+	unsigned int board_id = (board_status&0x0f000000)>>24;
+	xil_printf("Board id: %d\r\n", board_id);
+	mac_ethernet_address[5] = board_id;
+
 #if LWIP_IPV6==0
 #if LWIP_DHCP==1
     ipaddr.addr = 0;
@@ -164,29 +171,28 @@ int main()
 #else
 	/* initialize IP addresses to be used */
 	// JHU MOD: Changed IP address to link local
-	IP4_ADDR(&ipaddr,  169, 254,   0, 200);
+	IP4_ADDR(&ipaddr,  169, 254,  10, board_id);
 	IP4_ADDR(&netmask, 255, 255, 0,  0);
 	IP4_ADDR(&gw,      169, 254,   1,  1);
 #endif
 #endif
-	print_app_header();
+	// JHU MOD: Removed following call
+	//print_app_header();
 
 	lwip_init();
 
 #if (LWIP_IPV6 == 0)
 	/* Add network interface to the netif_list, and set it as default */
-	// JHU MOD: Changed PLATFORM_EMAC_BASEADDR to ECHO_EMAC_BASEADDR
 	if (!xemac_add(echo_netif, &ipaddr, &netmask,
 						&gw, mac_ethernet_address,
-						ECHO_EMAC_BASEADDR)) {
+						PLATFORM_EMAC_BASEADDR)) {
 		xil_printf("Error adding N/W interface\n\r");
 		return -1;
 	}
 #else
 	/* Add network interface to the netif_list, and set it as default */
-	// JHU MOD: Changed PLATFORM_EMAC_BASEADDR to ECHO_EMAC_BASEADDR
 	if (!xemac_add(echo_netif, NULL, NULL, NULL, mac_ethernet_address,
-						ECHO_EMAC_BASEADDR)) {
+						PLATFORM_EMAC_BASEADDR)) {
 		xil_printf("Error adding N/W interface\n\r");
 		return -1;
 	}

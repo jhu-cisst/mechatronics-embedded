@@ -191,7 +191,7 @@ bool ExportFpgaInfo(const char *fpga_ver, const char *fpga_sn, const char *board
 }
 
 // Set MAC and IP addresses for specified Ethernet adapter
-bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id)
+bool SetMACandIP(const char *ethName, unsigned int board_id)
 {
     struct ifreq ifr;
 
@@ -219,7 +219,7 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
     ifr.ifr_hwaddr.sa_data[1] = 0x61;
     ifr.ifr_hwaddr.sa_data[2] = 0x0E;
     ifr.ifr_hwaddr.sa_data[3] = 0x03;       // FPGA V3
-    ifr.ifr_hwaddr.sa_data[4] = ethNum;     // 0 or 1
+    ifr.ifr_hwaddr.sa_data[4] = 0x00;
     ifr.ifr_hwaddr.sa_data[5] = board_id;   // Board id: 0-15
     ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
     if (ioctl(sockfd, SIOCSIFHWADDR, &ifr) == -1)
@@ -227,7 +227,7 @@ bool SetMACandIP(const char *ethName, unsigned int ethNum, unsigned int board_id
 
     // Set IP address
     char ip_addr[16];
-    sprintf(ip_addr, "169.254.%d.%d", (10+ethNum), board_id);
+    sprintf(ip_addr, "169.254.%d.%d", 10, board_id);
     ifr.ifr_addr.sa_family = AF_INET;
     struct sockaddr_in* addr = (struct sockaddr_in*)&ifr.ifr_addr;
     inet_pton(AF_INET, ip_addr, &addr->sin_addr);
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
     emio.WriteQuadlet(12, reg_ethctrl);
 
     std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
-    if (!SetMACandIP("eth0", 0, board_id))
+    if (!SetMACandIP("eth0", board_id))
         std::cout << "Failed to set MAC or IP address for eth0" << std::endl;
 
     // Copy first 16 bytes (i.e., FPGA S/N)

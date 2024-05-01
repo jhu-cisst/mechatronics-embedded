@@ -17,7 +17,6 @@
 #   - OS_NAME            Operating system ("standalone" or "linux")
 #   - SYSROOT            Sysroot to use (linux)
 #   - LIBRARIES          BSP libraries to install (optional, standalone)
-#   - LWIP_PATCH_SOURCE  Patch to lwip library (optional, standalone)
 #   - DEPENDENCIES       Additional dependencies (optional)
 #
 # Description:
@@ -106,7 +105,6 @@ function (vitis_platform_create ...)
        OS_NAME
        SYSROOT
        LIBRARIES
-       LWIP_PATCH_SOURCE
        DEPENDENCIES)
 
   # reset local variables
@@ -128,14 +126,6 @@ function (vitis_platform_create ...)
   if (PLATFORM_NAME AND HW_FILE AND PROC_NAME AND OS_NAME)
 
     file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
-
-    # Path to lwip source files in build tree
-    set (BSP_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/${PROC_NAME}/${OS_NAME}_domain/bsp")
-    if (Vitis_VERSION_MAJOR EQUAL 2022)
-      set (LWIP_SRC_BUILD_DIR "${BSP_DIR}/${PROC_NAME}/libsrc/lwip211_v1_8/src/contrib/ports/xilinx/netif")
-    else ()
-      set (LWIP_SRC_BUILD_DIR "${BSP_DIR}/${PROC_NAME}/libsrc/lwip213_v1_0/src/contrib/ports/xilinx/netif")
-    endif ()
 
     # VITIS_SYSROOT is directory where Vitis creates a copy of sysroot
     set (VITIS_SYSROOT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/export/${PLATFORM_NAME}/sw/${PLATFORM_NAME}/linux_domain/sysroot")
@@ -165,13 +155,6 @@ function (vitis_platform_create ...)
     if (LIBRARIES)
       file (APPEND ${TCL_FILE} "bsp regenerate\n")
     endif (LIBRARIES)
-    if (LWIP_PATCH_SOURCE)
-      foreach (src ${LWIP_PATCH_SOURCE})
-        get_filename_component(fname ${src} NAME)
-        file (APPEND ${TCL_FILE} "puts \"Copying file ${fname}\"\n")
-        file (APPEND ${TCL_FILE} "file copy -force -- ${src} ${LWIP_SRC_BUILD_DIR}\n")
-      endforeach (src)
-    endif ()
     # Generate the platform (this compiles the BSP libraries)
     file (APPEND ${TCL_FILE} "puts \"Generating platform ...\"\n")
     file (APPEND ${TCL_FILE} "platform generate\n")
@@ -181,7 +164,7 @@ function (vitis_platform_create ...)
     add_custom_command (OUTPUT ${PLATFORM_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_FILE}
                         COMMENT "Creating ${PLATFORM_NAME}"
-                        DEPENDS ${HW_FILE} ${DEPENDENCIES} ${LWIP_PATCH_SOURCE})
+                        DEPENDS ${HW_FILE} ${DEPENDENCIES})
 
     add_custom_target(${PLATFORM_NAME} ALL
                       COMMENT "Checking ${PLATFORM_NAME}"
