@@ -10,6 +10,7 @@
 #include "xil_printf.h"
 #include "platform.h"
 #include "fpgav3_emio.h"
+#include "fpgav3_version.h"
 
 extern void outbyte(char c);
 extern char inbyte();
@@ -29,6 +30,12 @@ uint32_t get_dec(char *str);
 int main()
 {
     init_platform();
+
+    // Display software version (defined in fpgav3_version.h)
+    xil_printf("\r\nSoftware Version %s", FPGAV3_VERSION);
+    if (strcmp(FPGAV3_GIT_VERSION, FPGAV3_VERSION) != 0)
+        xil_printf(" (git %s)", FPGAV3_GIT_VERSION);
+    xil_printf("\r\n\n");
 
     // Initialize EMIO bus interface
     EMIO_Init();

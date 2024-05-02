@@ -3,7 +3,7 @@
 };
 
 &gem0 {
-    local-mac-address = [fa 61 0e 03 00 00];
+    local-mac-address = [fa 61 0e 03 00 ff];
     phy-handle = <&extphy0>;
     phy-mode="gmii";
     status = "okay";

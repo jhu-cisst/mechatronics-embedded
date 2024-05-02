@@ -26,11 +26,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <net/if_arp.h>
-#include <arpa/inet.h>
 #include <fpgav3_emio_gpiod.h>
 #include <fpgav3_qspi.h>
 #include <fpgav3_version.h>
@@ -193,56 +188,33 @@ bool ExportFpgaInfo(const char *fpga_ver, const char *fpga_sn, const char *board
 // Set MAC and IP addresses for specified Ethernet adapter
 bool SetMACandIP(const char *ethName, unsigned int board_id)
 {
-    struct ifreq ifr;
+    int ret;
+    char buffer[128];
 
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd == -1)
-        return false;
-
-    // Set interface name
-    strcpy(ifr.ifr_name, ethName);
-
-    // Get flags
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) == -1)
-        return false;
-
-    // Disable interface (ifdown)
-    if (ifr.ifr_flags & IFF_UP) {
-        ifr.ifr_flags &= ~IFF_UP;
-        if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) == -1)
-            return false;
-    }
+    // Disable interface
+    sprintf(buffer, "ip link set %s down", ethName);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "Error " << ret << ":" << buffer << std::endl;
 
     // Set MAC address
     // The first 3 bytes are the JHU LCSR CID
-    ifr.ifr_hwaddr.sa_data[0] = 0xFA;
-    ifr.ifr_hwaddr.sa_data[1] = 0x61;
-    ifr.ifr_hwaddr.sa_data[2] = 0x0E;
-    ifr.ifr_hwaddr.sa_data[3] = 0x03;       // FPGA V3
-    ifr.ifr_hwaddr.sa_data[4] = 0x00;
-    ifr.ifr_hwaddr.sa_data[5] = board_id;   // Board id: 0-15
-    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
-    if (ioctl(sockfd, SIOCSIFHWADDR, &ifr) == -1)
-        return false;
+    sprintf(buffer, "ip link set dev %s address FA:61:0E:03:00:%02d", ethName, board_id);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "Error " << ret << ":" << buffer << std::endl;
 
-    // Set IP address
-    char ip_addr[16];
-    sprintf(ip_addr, "169.254.%d.%d", 10, board_id);
-    ifr.ifr_addr.sa_family = AF_INET;
-    struct sockaddr_in* addr = (struct sockaddr_in*)&ifr.ifr_addr;
-    inet_pton(AF_INET, ip_addr, &addr->sin_addr);
-    if (ioctl(sockfd, SIOCSIFADDR, &ifr) == -1)
-        return false;
-
-    // Set netmask
-    inet_pton(AF_INET, "255.255.0.0", &addr->sin_addr);
-    if (ioctl(sockfd, SIOCSIFNETMASK, &ifr) == -1)
-        return false;
+    // Set IP address and netmask
+    sprintf(buffer, "ip addr add 169.254.10.%d/16 broadcast + dev %s", board_id, ethName);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "Error " << ret << ":" << buffer << std::endl;
 
     // Enable interface
-    ifr.ifr_flags |= IFF_UP;
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) == -1)
-        return false;
+    sprintf(buffer, "ip link set %s up", ethName);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "Error " << ret << ":" << buffer << std::endl;
 
     return true;
 }
@@ -358,9 +330,8 @@ int main(int argc, char **argv)
     std::cout << std::endl << "Enabling PS Ethernet" << std::endl;
     // Bit 25: mask for PS Ethernet enable
     // Bit 16: enable PS eth (Rev 9)
-    // Bit  8: enable eth1 (Rev 8)
-    // Bit  0: enable eth0 (Rev 8)
-    reg_ethctrl = 0x02010101;
+    // Removed support for Rev 8 (bits 8, 0)
+    reg_ethctrl = 0x02010000;
     emio.WriteQuadlet(12, reg_ethctrl);
 
     std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
