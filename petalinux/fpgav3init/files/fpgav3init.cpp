@@ -210,14 +210,14 @@ bool SetMACandIP(const char *ethName, unsigned int board_id)
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
 
-    // Enable UDP multicast to 224.0.0.100
-    sprintf(buffer, "ip route add 224.0.0.100/32 dev %s", ethName);
+    // Enable interface
+    sprintf(buffer, "ip link set %s up", ethName);
     ret = system(buffer);
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
 
-    // Enable interface
-    sprintf(buffer, "ip link set %s up", ethName);
+    // Enable UDP multicast to 224.0.0.100
+    sprintf(buffer, "ip route add 224.0.0.100/32 dev %s", ethName);
     ret = system(buffer);
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
