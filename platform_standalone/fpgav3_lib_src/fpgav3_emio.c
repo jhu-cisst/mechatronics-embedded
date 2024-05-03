@@ -9,7 +9,7 @@
 
 enum EMIO_Reg {
     Reg_OutputLower = 0x00000048,   // Data output, emio[31:0]
-    Reg_OutputUpper = 0x0000004c,   // Data input, emio[63:32]
+    Reg_OutputUpper = 0x0000004c,   // Data output, emio[63:32]
     Reg_InputLower  = 0x00000068,   // Data input, emio[31:0]
     Reg_InputUpper  = 0x0000006c,   // Data input, emio[63:32]
     Reg_DirLower    = 0x00000284,   // Direction: 0 = input (default), 1 = output
@@ -90,8 +90,11 @@ static bool WaitOpDone(const char *opType, uint16_t addr, unsigned int num)
 // This verifies the assumption that reg_data is set for input, since that
 // is their initial value and the Write methods set them to input before
 // returning.
-static bool isDataInput(const char *name)
+static bool setDataInput(const char *name)
 {
+    // Set reg_data as input
+    Xil_Out32(XPS_GPIO_BASEADDR + Reg_DirLower, 0x00000000);
+    // Now, do some sanity checking
     uint32_t upper;
     const uint32_t upper_mask = Bits_RequestBus | Bits_Write;
     upper = Xil_In32(XPS_GPIO_BASEADDR + Reg_InputUpper);
@@ -124,8 +127,8 @@ static bool setDataOutput(const char *name)
 
 bool EMIO_ReadQuadlet(uint16_t addr, uint32_t *data)
 {
-    // Verify that data lines set for input
-    if (!isDataInput("EMIO_ReadQuadlet"))
+    // Set data lines set for input and check state
+    if (!setDataInput("EMIO_ReadQuadlet"))
         return false;
 
     uint32_t outreg = addr;
@@ -145,6 +148,7 @@ bool EMIO_ReadQuadlet(uint16_t addr, uint32_t *data)
 
 bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data)
 {
+    // Set data lines for output and check state
     if (!setDataOutput("EMIO_WriteQuadlet"))
         return false;
 
@@ -159,8 +163,6 @@ bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data)
     WaitOpDone("write", addr, 5);
     // Set req_bus to 0 (also sets reg_addr and reg_wen to 0)
     Xil_Out32(XPS_GPIO_BASEADDR + Reg_OutputUpper, 0x00000000);
-    // Set reg_data as input (default state)
-    Xil_Out32(XPS_GPIO_BASEADDR + Reg_DirLower, 0x00000000);
     return true;
 }
 
@@ -172,7 +174,8 @@ bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
         return false;
     }
 
-    if (!isDataInput("EMIO_ReadBlock"))
+    // Set data lines for input and check state
+    if (!setDataInput("EMIO_ReadBlock"))
         return false;
 
     uint32_t val;
@@ -225,6 +228,7 @@ bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
     unsigned int q;
     unsigned int nQuads = (nBytes+3)/4;
 
+    // Set data lines for output and check state
     if (!setDataOutput("EMIO_WriteBlock"))
         return false;
 
@@ -259,8 +263,6 @@ bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
 
     // Set all lines to 0
     Xil_Out32(XPS_GPIO_BASEADDR + Reg_OutputUpper, 0);
-    // Set reg_data as input (default state)
-    Xil_Out32(XPS_GPIO_BASEADDR + Reg_DirLower, 0);
     return true;
 }
 
