@@ -133,9 +133,6 @@ protected:
 
 protected:
 
-    // Wait for op_done to be set, using either events or polling (default)
-    virtual bool WaitOpDone(const char *opType, unsigned int num) = 0;
-
     // Local methods for timing measurements
     static void GetCurTime(fpgav3_time_t *curTime);
     static double TimeDiff_us(fpgav3_time_t *startTime, fpgav3_time_t *endTime);

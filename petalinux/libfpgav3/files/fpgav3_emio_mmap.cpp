@@ -294,8 +294,6 @@ bool EMIO_Interface_Mmap::WriteQuadlet(uint16_t addr, uint32_t data)
 
     // Set req_bus to 0 (also sets reg_addr and reg_wen to 0)
     RegisterWrite(Reg_OutputUpper, 0x00000000);
-    // Set reg_data as input (default state)
-    RegisterWrite(Reg_DirLower, 0x00000000);
 
     // Get end time
     if (ret && (doTiming > 0)) {
@@ -454,7 +452,6 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
         // Wait for op_done to be set
         if (!WaitOpDone("write", q)) {
             RegisterWrite(Reg_OutputUpper, 0);
-            RegisterWrite(Reg_DirLower, 0);
             return false;
         }
     }
@@ -464,8 +461,6 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
 
     // Set all lines to 0
     RegisterWrite(Reg_OutputUpper, 0);
-    // Set reg_data as input (default state)
-    RegisterWrite(Reg_DirLower, 0);
 
     // Get end time
     if (doTiming > 0) {
