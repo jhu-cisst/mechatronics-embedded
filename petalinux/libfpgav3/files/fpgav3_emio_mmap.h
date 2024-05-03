@@ -53,7 +53,7 @@ protected:
 
     void RegisterWrite(uint32_t reg_addr, uint32_t reg_data);
 
-    bool WaitOpDone(const char *opType, unsigned int num);
+    bool WaitOpDone(const char *opType, unsigned int num, bool state = true);
 
 };
 

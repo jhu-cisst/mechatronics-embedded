@@ -22,7 +22,7 @@ const uint32_t GPIO_SIZE          = 0x000002E8;
 // GPIO registers used for EMIO interface
 enum EMIO_Reg {
     Reg_OutputLower = 0x00000048,   // Data output, emio[31:0]
-    Reg_OutputUpper = 0x0000004c,   // Data input, emio[63:32]
+    Reg_OutputUpper = 0x0000004c,   // Data output, emio[63:32]
     Reg_InputLower  = 0x00000068,   // Data input, emio[31:0]
     Reg_InputUpper  = 0x0000006c,   // Data input, emio[63:32]
     Reg_DirLower    = 0x00000284,   // Direction: 0 = input (default), 1 = output
@@ -165,30 +165,32 @@ void EMIO_Interface_Mmap::RegisterWrite(uint32_t reg_addr, uint32_t reg_data)
     *(reinterpret_cast<uint32_t *>(mmap_region)+(reg_addr/sizeof(uint32_t))) = reg_data;
 }
 
-// Local method to wait for op_done to be set, using polling
-bool EMIO_Interface_Mmap::WaitOpDone(const char *opType, unsigned int num)
+// Local method to wait for op_done to be set (if state is true) or cleared (if state is false),
+// using polling
+bool EMIO_Interface_Mmap::WaitOpDone(const char *opType, unsigned int num, bool state)
 {
     // op_done should be set quickly by firmware, to indicate that read or write
     // has completed. If the FPGA bus is not busy (due to Firewire or Ethernet
     // access), it should be ready right away.
-    uint32_t upper = RegisterRead(Reg_InputUpper);
-    if (!(upper & Bits_OpDone)) {
+    bool opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(~state);
+    if (!opdone) {
         fpgav3_time_t waitStart;
         fpgav3_time_t curTime;
         GetCurTime(&waitStart);
         double dt = 0.0;   // elapsed time in us
         while (dt < timeout_us) {
-            upper = RegisterRead(Reg_InputUpper);
-            if (upper & Bits_OpDone)
+            opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(~state);
+            if (opdone)
                 break;
             GetCurTime(&curTime);
             dt = TimeDiff_us(&waitStart, &curTime);
         }
         if (isVerbose) {
-            if (upper & Bits_OpDone)
-                std::cout << "Waited " << dt << " us for " << opType << " quadlet " << num << std::endl;
+            if (opdone)
+                std::cout << "Waited " << dt << " us for ";
             else
-                std::cout << "EMIO polling timeout waiting for " << opType << " quadlet " << num << std::endl;
+                std::cout << "EMIO polling timeout waiting for ";
+            std::cout << opType << " quadlet " << num << (state ? " set" : " clear") << std::endl;
         }
     }
     return true;
@@ -235,6 +237,9 @@ bool EMIO_Interface_Mmap::ReadQuadlet(uint16_t addr, uint32_t &data)
     data = RegisterRead(Reg_InputLower);
     // Set req_bus to 0 (also sets reg_addr to 0)
     RegisterWrite(Reg_OutputUpper, 0x00000000);
+
+    // Wait for op_done to be cleared
+    WaitOpDone("read", 0, false);
 
     // Get end time
     if (doTiming > 0) {
@@ -294,6 +299,9 @@ bool EMIO_Interface_Mmap::WriteQuadlet(uint16_t addr, uint32_t data)
 
     // Set req_bus to 0 (also sets reg_addr and reg_wen to 0)
     RegisterWrite(Reg_OutputUpper, 0x00000000);
+
+    // Wait for op_done to be cleared
+    WaitOpDone("write", 0, false);
 
     // Get end time
     if (ret && (doTiming > 0)) {
@@ -377,6 +385,9 @@ bool EMIO_Interface_Mmap::ReadBlock(uint16_t addr, uint32_t *data, unsigned int 
     // Set all lines to 0
     RegisterWrite(Reg_OutputUpper, 0);
 
+    // Wait for op_done to be cleared
+    WaitOpDone("read", q, false);
+
     // Get end time
     if (doTiming > 0) {
         GetCurTime(&endTime);
@@ -458,6 +469,9 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
 
     if (doTiming > 1)
         GetCurTime(&lastWrite);
+
+    // Wait for op_done to be cleared
+    WaitOpDone("write", q, false);
 
     // Set all lines to 0
     RegisterWrite(Reg_OutputUpper, 0);
