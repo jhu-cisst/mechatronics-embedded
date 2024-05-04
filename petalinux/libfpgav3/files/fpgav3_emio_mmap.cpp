@@ -172,14 +172,14 @@ bool EMIO_Interface_Mmap::WaitOpDone(const char *opType, unsigned int num, bool 
     // op_done should be set quickly by firmware, to indicate that read or write
     // has completed. If the FPGA bus is not busy (due to Firewire or Ethernet
     // access), it should be ready right away.
-    bool opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(~state);
+    bool opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(!state);
     if (!opdone) {
         fpgav3_time_t waitStart;
         fpgav3_time_t curTime;
         GetCurTime(&waitStart);
         double dt = 0.0;   // elapsed time in us
         while (dt < timeout_us) {
-            opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(~state);
+            opdone = (RegisterRead(Reg_InputUpper) & Bits_OpDone)^(!state);
             if (opdone)
                 break;
             GetCurTime(&curTime);
