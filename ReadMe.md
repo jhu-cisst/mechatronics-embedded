@@ -75,17 +75,7 @@ only provides the option to format as exFAT or NTFS.
 
 ## Release Notes
 
-  * Rev 1.0.1 (November 27, 2023)
-    * Create toolchain files to cross-compile with Vitis or clang
-    * Support use of sysroot from GitHub release
-    * Added EMIO_GetVerbose and EMIO_SetVerbose methods
-    * Implemented real-time block read and write of FPGA registers via EMIO
-    * ESPM Firmware Version 2, which improves reliability of reading instrument id
-
-  * Rev 1.0.0 (August 10, 2023)
-    * Initial Release
-    * Uses Firmware Rev 8
-    * Output files built with Xilinx 2023.1 tools on Ubuntu 20.04
+  * See [GitHub Releases](https://github.com/jhu-cisst/mechatronics-embedded/releases)
 
 ## Xilinx Tool Version Dependencies
 
