@@ -30,7 +30,10 @@ set (LIBFPGAV3_SOURCE "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio.cpp"
                       "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_mmap.cpp"
                       "${LIBFPGAV3_SOURCE_DIR}/fpgav3_emio_mmap.h"
                       "${LIBFPGAV3_SOURCE_DIR}/fpgav3_qspi.cpp"
-                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_qspi.h")
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_qspi.h"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_lib.cpp"
+                      "${LIBFPGAV3_SOURCE_DIR}/fpgav3_lib.h"
+                      ${FPGAV3_VERSION_HEADER})
 
 add_library (fpgav3 SHARED ${LIBFPGAV3_SOURCE})
 

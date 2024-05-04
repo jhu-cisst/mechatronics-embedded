@@ -53,6 +53,8 @@ if (USE_PETALINUX_SYSROOT)
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_emio_mmap.h"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.cpp"
                         "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_qspi.h"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_lib.cpp"
+                        "${CMAKE_SOURCE_DIR}/petalinux/libfpgav3/files/fpgav3_lib.h"
                         ${FPGAV3_VERSION_HEADER})
 
 

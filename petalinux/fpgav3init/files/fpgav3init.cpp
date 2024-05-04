@@ -28,7 +28,7 @@
 #include <sys/sendfile.h>
 #include <fpgav3_emio_gpiod.h>
 #include <fpgav3_qspi.h>
-#include <fpgav3_version.h>
+#include <fpgav3_lib.h>
 
 // Detected board type
 enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
@@ -260,11 +260,9 @@ int main(int argc, char **argv)
 {
     std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
 
-    // Display software version (defined in fpgav3_version.h)
-    std::cout << "Software Version " << FPGAV3_VERSION;
-    if (strcmp(FPGAV3_GIT_VERSION, FPGAV3_VERSION) != 0)
-        std::cout << " (git " << FPGAV3_GIT_VERSION << ")";
-    std::cout << std::endl << std::endl;
+    // Display software versions
+    print_fpgav3_versions(std::cout);
+    std::cout << std::endl;
 
     // Get FPGA Serial Number
     char fpga_sn[FPGA_SN_SIZE];

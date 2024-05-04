@@ -39,6 +39,8 @@ set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_lib.h"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_lib.cpp"
                        ${FPGAV3_VERSION_HEADER}
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/Makefile")
 

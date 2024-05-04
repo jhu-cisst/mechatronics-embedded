@@ -17,6 +17,7 @@
 #include <byteswap.h>
 #include <fpgav3_emio_gpiod.h>
 #include <fpgav3_emio_mmap.h>
+#include <fpgav3_lib.h>
 
 int main(int argc, char **argv)
 {
@@ -116,6 +117,7 @@ int main(int argc, char **argv)
     emio->SetTimingMode(timingMode);
 
     if (isVerbose) {
+        print_fpgav3_versions(std::cout);
         if (useGpiod)
             std::cout << "GPIOD library version " << EMIO_gpiod_version_string() << std::endl;
         std::cout << "EMIO bus interface version " << emio->GetVersion() << std::endl;
