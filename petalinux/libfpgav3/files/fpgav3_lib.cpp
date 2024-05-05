@@ -17,6 +17,11 @@ const char *libfpgav3_git_version()
     return FPGAV3_GIT_VERSION;
 }
 
+uint32_t libfpgav3_git_sha()
+{
+    return FPGAV3_GIT_SHA;
+}
+
 void print_fpgav3_versions(std::ostream &outStr, const char *version, const char *git_version)
 {
     outStr << "Software Version " << version;
