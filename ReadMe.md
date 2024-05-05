@@ -27,6 +27,7 @@ The current setup requires the software to be built from a git working tree (i.e
 The CMake dependency checking is not perfect, so sometimes it is necessary to either start with
 a clean build tree, or to manually force certain subprojects to be rebuilt. Many subprojects create a
 `cmake.copy` file in the build tree and deleting this file will cause the subproject to be rebuilt.
+Similarly, deleting `petalinux/images/linux/image.ub` will cause the kernel image to be rebuilt.
 
 ## Build Process
 
