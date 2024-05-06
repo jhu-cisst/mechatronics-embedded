@@ -14,10 +14,6 @@ else ()
   set (LWIP_LIB "lwip213")
 endif ()
 
-# Patch to lwIP library needed for RTL8211F
-set (LWIP_PATCH_FILES
-     "${CMAKE_CURRENT_SOURCE_DIR}/bsp_lib_src/${LWIP_LIB}/xemacpsif_physpeed.c")
-
 # Libraries to include (xilffs required for fsbl, lwip for echo)
 set (BSP_LIBRARIES "xilffs" "xilrsa" ${LWIP_LIB})
 
@@ -28,7 +24,6 @@ vitis_platform_create(
     PROC_NAME         "ps7_cortexa9_0"
     OS_NAME           "standalone"
     LIBRARIES         ${BSP_LIBRARIES}
-    LWIP_PATCH_SOURCE ${LWIP_PATCH_FILES}
     DEPENDENCIES      ${BLOCK_DESIGN_NAME})
 
 ############################ FPGAV3 Lib #############################
@@ -39,7 +34,8 @@ set (FPGAV3LIB_TARGET "${FPGAV3LIB_NAME}lib")
 # Additional source files
 set (FPGAV3LIB_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.h"
-     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.c"
+     ${FPGAV3_VERSION_HEADER})
 
 vitis_create (LIBRARY
     TARGET_NAME    ${FPGAV3LIB_TARGET}
@@ -47,11 +43,12 @@ vitis_create (LIBRARY
     LIB_TYPE       "static"
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     ADD_SOURCE     ${FPGAV3LIB_SOURCE}
-    BUILD_CONFIG   "Release")
+    BUILD_CONFIG   "Release"
+    DEPENDENCIES   FpgaVersionFile)
 
 ############################ FSBL App #############################
 
-set (FSBL_NAME   "zynq_fsbl")
+set (FSBL_NAME   ${VITIS_FSBL_TARGET})
 set (FSBL_CONFIG "Release")
 
 # Additional source files
@@ -104,6 +101,7 @@ vitis_create (APP
     PLATFORM_NAME  ${PLATFORM_STANDALONE}
     TEMPLATE_NAME  "lwIP Echo Server"
     ADD_SOURCE     ${ECHO_TEST_SOURCE}
+    TARGET_LIBS    ${FPGAV3LIB_TARGET}
     BUILD_CONFIG   ${ECHO_TEST_CONFIG})
 
 get_property(ECHO_TEST_OUTPUT TARGET ${ECHO_TEST_NAME} PROPERTY OUTPUT_NAME)
@@ -123,6 +121,7 @@ vitis_create (APP
     TEMPLATE_NAME  "Hello World"
     ADD_SOURCE     ${DEMO_APP_SOURCE}
     DEL_SOURCE     ${DEMO_APP_DELETE}
+    TARGET_LIBS    ${FPGAV3LIB_TARGET}
     BUILD_CONFIG   ${DEMO_APP_CONFIG})
 
 get_property(DEMO_APP_OUTPUT TARGET ${DEMO_APP_NAME} PROPERTY OUTPUT_NAME)

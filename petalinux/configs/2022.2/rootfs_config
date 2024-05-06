@@ -100,7 +100,7 @@ CONFIG_system-zynq=y
 #
 # dnf
 #
-# CONFIG_dnf is not set
+CONFIG_dnf=y
 
 #
 # e2fsprogs 
@@ -2986,7 +2986,7 @@ CONFIG_packagegroup-core-ssh-dropbear=y
 #
 # tcf-agent 
 #
-CONFIG_tcf-agent=y
+# CONFIG_tcf-agent is not set
 # CONFIG_tcf-agent-dbg is not set
 # CONFIG_tcf-agent-dev is not set
 
@@ -3317,7 +3317,7 @@ CONFIG_tcpdump=y
 # CONFIG_avahi-autoipd is not set
 # CONFIG_avahi-utils is not set
 # CONFIG_libavahi-common is not set
-# CONFIG_avahi-daemon is not set
+CONFIG_avahi-daemon=y
 # CONFIG_libavahi-gobject is not set
 
 #
@@ -3893,6 +3893,7 @@ CONFIG_Init-manager-sysvinit=y
 # apps 
 #
 CONFIG_libfpgav3=y
+CONFIG_fpgav3block=y
 CONFIG_fpgav3init=y
 CONFIG_fpgav3sn=y
 

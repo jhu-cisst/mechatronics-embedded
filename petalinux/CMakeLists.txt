@@ -18,20 +18,30 @@ endif ()
 
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
+# Custom recipes-core
+set (PETALINUX_RECIPES_CORE "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
 
 petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
                   CONFIG_MENU        ${PETALINUX_MENU}
                   CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
-                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE})
+                  DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
+                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
 
 # ************************** fpgav3 library *******************************
 
 set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.h"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.c"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.cpp"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.h"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_gpiod.cpp"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.h"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio_mmap.cpp"
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.h"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.c"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_qspi.cpp"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_lib.h"
+                       "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_lib.cpp"
+                       ${FPGAV3_VERSION_HEADER}
                        "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/Makefile")
 
 set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
@@ -39,11 +49,14 @@ set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
 petalinux_app_create (APP_NAME       "libfpgav3"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${LIBFPGAV3_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${LIBFPGAV3_BB})
+
+add_dependencies (libfpgav3 FpgaVersionFile)
 
 # ************************** fpgav3init app *******************************
 
-set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.c"
+set (FPGAV3INIT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.cpp"
                         "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/files/fpgav3init.service")
 
 set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbappend")
@@ -51,24 +64,47 @@ set (FPGAV3INIT_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3init/fpgav3init.bbap
 petalinux_app_create (APP_NAME       "fpgav3init"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3INIT_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${FPGAV3INIT_BBAPPEND})
 
 # ************************** fpgav3sn app ********************************
 
-set (FPGAV3SN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/files/fpgav3sn.c")
+set (FPGAV3SN_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/files/fpgav3sn.cpp")
 
 set (FPGAV3SN_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3sn/fpgav3sn.bbappend")
 
 petalinux_app_create (APP_NAME       "fpgav3sn"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3SN_SOURCES}
+                      APP_TEMPLATE   "c++"
                       APP_BB         ${FPGAV3SN_BBAPPEND})
+
+# ************************** fpgav3block app *******************************
+
+set (FPGAV3BLOCK_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3block/files/fpgav3block.cpp")
+
+set (FPGAV3BLOCK_BBAPPEND "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3block/fpgav3block.bbappend")
+
+petalinux_app_create (APP_NAME       "fpgav3block"
+                      PROJ_NAME      ${PETALINUX_PROJ_NAME}
+                      APP_SOURCES    ${FPGAV3BLOCK_SOURCES}
+                      APP_TEMPLATE   "c++"
+                      APP_BB         ${FPGAV3BLOCK_BBAPPEND})
+
+# ************************** Petalinux build *******************************
 
 set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
                           "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND}
-                          "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND})
+                          "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND}
+                          "fpgav3block" ${FPGAV3BLOCK_SOURCES}   ${FPGAV3BLOCK_BBAPPEND})
 
-# ************************** Petalinux build *******************************
+if (VITIS_FSBL_TARGET)
+  get_property(FSBL_FILE TARGET ${VITIS_FSBL_TARGET} PROPERTY OUTPUT_NAME)
+  set (FSBL_OPTION  "FSBL_FILE" ${FSBL_FILE})
+  set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${FSBL_FILE})
+else ()
+  set (FSBL_OPTION "")
+endif ()
 
 set (PETALINUX_BUILD_TARGET "${PETALINUX_PROJ_NAME}_build")
 
@@ -77,9 +113,10 @@ petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  CONFIG_MENU         ${PETALINUX_MENU}
                  ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
+                 ${FSBL_OPTION}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
 
-# *********************** Petalinux SDK (sysroot) **************************
+# *************** Petalinux generated output: MicroSD and sysroot (SDK) *********************
 
 # Directory for generated ZIP files (SD-Image and sysroot)
 set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}-generated")
@@ -87,20 +124,9 @@ set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}
 set (README_GEN "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
 file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
 
-if (BUILD_PETALINUX_SYSROOT)
+set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
 
-  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-sysroot-cortexa9.zip")
-  set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
-
-  file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
-
-  petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
-                       PROJ_NAME       ${PETALINUX_PROJ_NAME}
-                       SDK_INSTALL_DIR ${PETALINUX_SDK}
-                       SYSROOT_ZIP     ${PETALINUX_SYSROOT_ZIP}
-                       DEPENDENCIES    ${PETALINUX_BUILD_TARGET})
-
-endif ()
+# ***************************** Petalinux MicroSD zip file **********************************
 
 if (mechatronics-firmware_FOUND AND Vitis_FOUND)
 
@@ -137,12 +163,15 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
   file (APPEND  ${README_SD} "programmer, in which case all other files are not used.\n")
 
+  set (VERSION_IN_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
   set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
-  file (WRITE   ${VERSION_FILE} "mechatronics-embedded ${EMBEDDED_VERSION}\n")
-  file (APPEND  ${VERSION_FILE} "mechatronics-firmware ${FIRMWARE_VERSION}\n")
-  file (APPEND  ${VERSION_FILE} "xilinx-tools          ${Xilinx_VERSION}\n")
-  file (APPEND  ${VERSION_FILE} "fpga-hw               ${FPGA_VERSION}\n")
-  file (APPEND  ${VERSION_FILE} "espm-firmware         ${ESPM_FIRMWARE_VERSION}\n")
+
+  file (WRITE   ${VERSION_IN_FILE} "mechatronics-embedded     ${EMBEDDED_VERSION}\n")
+  file (APPEND  ${VERSION_IN_FILE} "mechatronics-embedded-git @GIT_VERSION@\n")
+  file (APPEND  ${VERSION_IN_FILE} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
+  file (APPEND  ${VERSION_IN_FILE} "xilinx-tools              ${Xilinx_VERSION}\n")
+  file (APPEND  ${VERSION_IN_FILE} "fpga-hw                   ${FPGA_VERSION}\n")
+  file (APPEND  ${VERSION_IN_FILE} "espm-firmware             ${ESPM_FIRMWARE_VERSION}\n")
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}/images/linux")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")
@@ -166,8 +195,15 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              ${ESPM_FIRMWARE_FILE}
                              ${SD_IMAGE_DIR}
+                     COMMAND ${CMAKE_COMMAND}
+                               -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                               -DTAG_PREFIX="v"
+                               -DIN_FILE=${VERSION_IN_FILE}
+                               -DOUT_FILE=${VERSION_FILE}
+                               -DCONFIG_OPTIONS="@ONLY"
+                               -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
                      COMMENT "Creating MicroSD Image"
-                     DEPENDS "${PETALINUX_BUILD_TARGET}")
+                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_IN_FILE})
 
   set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
                      "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin")
@@ -187,8 +223,28 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMENT "Checking MicroSD Zip"
                      DEPENDS "MicroSDImage" ${PETALINUX_MICROSD_ZIP})
 
+  # The Petalinux SDK does not actually depend on the MicroSD zip file,
+  # but we set this dependency to control the build order
+  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_SDK_DEPENDENCIES} "MicroSDzip")
+
 else ()
 
   message (WARNING "Not configured to create MicroSD image")
+
+endif ()
+
+# *********************** Petalinux SDK (sysroot) **************************
+
+if (BUILD_PETALINUX_SYSROOT)
+
+  set (PETALINUX_SYSROOT_ZIP_FILE "${PETALINUX_PROJ_NAME}-sysroot-cortexa9.zip")
+  set (PETALINUX_SYSROOT_ZIP      "${PETALINUX_GENERATED_DIR}/${PETALINUX_SYSROOT_ZIP_FILE}")
+  file (APPEND ${README_GEN} "  ${PETALINUX_SYSROOT_ZIP_FILE}: petalinux-generated sysroot (no debug files)\n")
+
+  petalinux_build_sdk (TARGET_NAME     ${PETALINUX_SDK_TARGET}
+                       PROJ_NAME       ${PETALINUX_PROJ_NAME}
+                       SDK_INSTALL_DIR ${PETALINUX_SDK}
+                       SYSROOT_ZIP     ${PETALINUX_SYSROOT_ZIP}
+                       DEPENDENCIES    ${PETALINUX_SDK_DEPENDENCIES})
 
 endif ()

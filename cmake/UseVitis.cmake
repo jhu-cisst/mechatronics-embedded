@@ -17,7 +17,6 @@
 #   - OS_NAME            Operating system ("standalone" or "linux")
 #   - SYSROOT            Sysroot to use (linux)
 #   - LIBRARIES          BSP libraries to install (optional, standalone)
-#   - LWIP_PATCH_SOURCE  Patch to lwip library (optional, standalone)
 #   - DEPENDENCIES       Additional dependencies (optional)
 #
 # Description:
@@ -42,6 +41,7 @@
 #   - PLATFORM_NAME   Name of platform (created by vitis_platform_create)
 #   - TEMPLATE_NAME   Name of Vitis application template (APP only)
 #   - LIB_TYPE        Library type (static or shared) (LIBRARY only)
+#   - LANGUAGE        Language (optional, c or c++, default is c)
 #   - ADD_SOURCE      Additional source files (optional)
 #   - DEL_SOURCE      Source files to delete (optional, APP only)
 #   - TARGET_LIBS     Library targets (optional, APP only)
@@ -55,6 +55,11 @@
 #   TEMPLATE_NAME must be specified. For a LIBRARY, LIB_TYPE must be specified.
 #   Specifying a leading '/' in COMPILER_FLAGS (e.g., "/FSBL_DEBUG_INFO")
 #   causes that compiler option to be removed.
+#
+#   TEMPLATE_NAME can be anything returned by xsct command "repo -apps", including:
+#       linux (C programs): "Linux Empty Application", "Linux Hello World"
+#       standalone: "Zynq FSBL", "lwIP Echo Server", "Hello World", "Empty Application(C)"
+#       If LANGUAGE is c++, then it should be "Empty Application (C++)"
 #
 #   The optional DEPENDENCIES parameter can specify additional dependencies, beyond
 #   the assumed dependency on TARGET_LIBS.
@@ -100,7 +105,6 @@ function (vitis_platform_create ...)
        OS_NAME
        SYSROOT
        LIBRARIES
-       LWIP_PATCH_SOURCE
        DEPENDENCIES)
 
   # reset local variables
@@ -122,14 +126,6 @@ function (vitis_platform_create ...)
   if (PLATFORM_NAME AND HW_FILE AND PROC_NAME AND OS_NAME)
 
     file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
-
-    # Path to lwip source files in build tree
-    set (BSP_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/${PROC_NAME}/${OS_NAME}_domain/bsp")
-    if (Vitis_VERSION_MAJOR EQUAL 2022)
-      set (LWIP_SRC_BUILD_DIR "${BSP_DIR}/${PROC_NAME}/libsrc/lwip211_v1_8/src/contrib/ports/xilinx/netif")
-    else ()
-      set (LWIP_SRC_BUILD_DIR "${BSP_DIR}/${PROC_NAME}/libsrc/lwip213_v1_0/src/contrib/ports/xilinx/netif")
-    endif ()
 
     # VITIS_SYSROOT is directory where Vitis creates a copy of sysroot
     set (VITIS_SYSROOT "${CMAKE_CURRENT_BINARY_DIR}/${PLATFORM_NAME}/export/${PLATFORM_NAME}/sw/${PLATFORM_NAME}/linux_domain/sysroot")
@@ -159,13 +155,6 @@ function (vitis_platform_create ...)
     if (LIBRARIES)
       file (APPEND ${TCL_FILE} "bsp regenerate\n")
     endif (LIBRARIES)
-    if (LWIP_PATCH_SOURCE)
-      foreach (src ${LWIP_PATCH_SOURCE})
-        get_filename_component(fname ${src} NAME)
-        file (APPEND ${TCL_FILE} "puts \"Copying file ${fname}\"\n")
-        file (APPEND ${TCL_FILE} "file copy -force -- ${src} ${LWIP_SRC_BUILD_DIR}\n")
-      endforeach (src)
-    endif ()
     # Generate the platform (this compiles the BSP libraries)
     file (APPEND ${TCL_FILE} "puts \"Generating platform ...\"\n")
     file (APPEND ${TCL_FILE} "platform generate\n")
@@ -175,7 +164,7 @@ function (vitis_platform_create ...)
     add_custom_command (OUTPUT ${PLATFORM_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_FILE}
                         COMMENT "Creating ${PLATFORM_NAME}"
-                        DEPENDS ${HW_FILE} ${DEPENDENCIES} ${LWIP_PATCH_SOURCE})
+                        DEPENDS ${HW_FILE} ${DEPENDENCIES})
 
     add_custom_target(${PLATFORM_NAME} ALL
                       COMMENT "Checking ${PLATFORM_NAME}"
@@ -204,6 +193,7 @@ function (vitis_create OBJECT_TYPE ...)
        PLATFORM_NAME
        TEMPLATE_NAME
        LIB_TYPE
+       LANGUAGE
        ADD_SOURCE
        DEL_SOURCE
        TARGET_LIBS
@@ -311,10 +301,17 @@ function (vitis_create OBJECT_TYPE ...)
     file (APPEND ${TCL_CREATE} "  if { [catch {${XSCT_CMD} remove ${OBJECT_NAME}} errMsg ]} {\n")
     file (APPEND ${TCL_CREATE} "    puts stderr \"${XSCT_CMD} remove: $errMsg\"\n  }\n}\n")
     # Create app or library, using active platform (and domain); also creates sysproj ${OBJECT_NAME}_system
-    if (XSCT_CMD STREQUAL "app")
-      file (APPEND ${TCL_CREATE} "app create -name ${OBJECT_NAME} -template {${TEMPLATE_NAME}}\n")
+    # If LANGUAGE is specified, also set that (note that it can be specified for app or library, even though
+    # Xilinx documentation does not mention it for library).
+    if (LANGUAGE)
+      set (LANG_OPTION "-lang {${LANGUAGE}}")
     else ()
-      file (APPEND ${TCL_CREATE} "library create -name ${OBJECT_NAME} -type ${LIB_TYPE}\n")
+      set (LANG_OPTION "")
+    endif ()
+    if (XSCT_CMD STREQUAL "app")
+      file (APPEND ${TCL_CREATE} "app create -name ${OBJECT_NAME} -template {${TEMPLATE_NAME}} ${LANG_OPTION}\n")
+    else ()
+      file (APPEND ${TCL_CREATE} "library create -name ${OBJECT_NAME} -type ${LIB_TYPE} ${LANG_OPTION}\n")
     endif ()
     # Set build configuration (i.e., Release or Debug)
     file (APPEND ${TCL_CREATE} "if { [catch {${XSCT_CMD} config -name ${OBJECT_NAME} build-config ${BUILD_CONFIG}} errMsgCfg ]} {\n")
@@ -408,6 +405,7 @@ function (vitis_create OBJECT_TYPE ...)
                         DEPENDS ${OBJECT_PRJ_COPY} ${ADD_SOURCE} ${TARGET_OUTPUTS})
 
     add_custom_target(${TARGET_NAME} ALL
+                      COMMENT "Checking ${TARGET_NAME}"
                       DEPENDS ${OBJECT_OUTPUT} ${TARGET_LIBS} ${PLATFORM_NAME} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
@@ -483,6 +481,7 @@ function (vitis_boot_create ...)
                         DEPENDS ${FSBL_FILE} ${BIT_FILE} ${APP_FILE} ${DEPENDENCIES})
 
     add_custom_target(${BIF_NAME} ALL
+                      COMMENT "Checking ${BIF_NAME}"
                       DEPENDS ${BOOT_FILE})
 
   else ()

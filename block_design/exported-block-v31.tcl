@@ -200,8 +200,29 @@ proc create_root_design { parentCell } {
 
   set RGMII_1 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:rgmii_rtl:1.0 RGMII_1 ]
 
+  set GMII_ETHERNET_0_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gmii_rtl:1.0 GMII_ETHERNET_0_0 ]
+
+  set MDIO_ETHERNET_0_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:mdio_rtl:1.0 MDIO_ETHERNET_0_0 ]
+
+  set GMII_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:gmii_rtl:1.0 GMII_0 ]
+
+  set MDIO_GEM_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:mdio_rtl:1.0 MDIO_GEM_0 ]
+
+  set MDIO_GEM_1 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:mdio_rtl:1.0 MDIO_GEM_1 ]
+
+  set GMII_1 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:gmii_rtl:1.0 GMII_1 ]
+
 
   # Create ports
+  set RESETn_PHY_0 [ create_bd_port -dir O -type rst RESETn_PHY_0 ]
+  set ENET0_EXT_INTIN_0 [ create_bd_port -dir I -type intr ENET0_EXT_INTIN_0 ]
+  set FCLK_CLK1_125 [ create_bd_port -dir O -type clk FCLK_CLK1_125 ]
+  set link_status_0 [ create_bd_port -dir O link_status_0 ]
+  set link_status_1 [ create_bd_port -dir O link_status_1 ]
+  set clock_speed_0 [ create_bd_port -dir O -from 1 -to 0 clock_speed_0 ]
+  set clock_speed_1 [ create_bd_port -dir O -from 1 -to 0 clock_speed_1 ]
+  set speed_mode_0 [ create_bd_port -dir O -from 1 -to 0 speed_mode_0 ]
+  set speed_mode_1 [ create_bd_port -dir O -from 1 -to 0 speed_mode_1 ]
 
   # Create instance: gmii_to_rgmii_0, and set properties
   set gmii_to_rgmii_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:gmii_to_rgmii:4.1 gmii_to_rgmii_0 ]
@@ -226,7 +247,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ACT_ENET0_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_ENET1_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_FPGA0_PERIPHERAL_FREQMHZ {200.000000} \
-    CONFIG.PCW_ACT_FPGA1_PERIPHERAL_FREQMHZ {10.000000} \
+    CONFIG.PCW_ACT_FPGA1_PERIPHERAL_FREQMHZ {125.000000} \
     CONFIG.PCW_ACT_FPGA2_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_FPGA3_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_PCAP_PERIPHERAL_FREQMHZ {200.000000} \
@@ -244,7 +265,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ACT_UART_PERIPHERAL_FREQMHZ {100.000000} \
     CONFIG.PCW_ACT_WDT_PERIPHERAL_FREQMHZ {111.111115} \
     CONFIG.PCW_CLK0_FREQ {200000000} \
-    CONFIG.PCW_CLK1_FREQ {10000000} \
+    CONFIG.PCW_CLK1_FREQ {125000000} \
     CONFIG.PCW_CLK2_FREQ {10000000} \
     CONFIG.PCW_CLK3_FREQ {10000000} \
     CONFIG.PCW_DDR_RAM_HIGHADDR {0x3FFFFFFF} \
@@ -253,21 +274,22 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ENET0_GRP_MDIO_IO {EMIO} \
     CONFIG.PCW_ENET0_PERIPHERAL_ENABLE {1} \
     CONFIG.PCW_ENET0_PERIPHERAL_FREQMHZ {1000 Mbps} \
-    CONFIG.PCW_ENET1_ENET1_IO {EMIO} \
-    CONFIG.PCW_ENET1_GRP_MDIO_ENABLE {1} \
-    CONFIG.PCW_ENET1_GRP_MDIO_IO {EMIO} \
-    CONFIG.PCW_ENET1_PERIPHERAL_ENABLE {1} \
-    CONFIG.PCW_ENET1_PERIPHERAL_FREQMHZ {1000 Mbps} \
+    CONFIG.PCW_ENET1_PERIPHERAL_CLKSRC {External} \
+    CONFIG.PCW_ENET1_PERIPHERAL_ENABLE {0} \
+    CONFIG.PCW_EN_CLK1_PORT {1} \
     CONFIG.PCW_EN_EMIO_CD_SDIO0 {0} \
     CONFIG.PCW_EN_EMIO_ENET0 {1} \
-    CONFIG.PCW_EN_EMIO_ENET1 {1} \
+    CONFIG.PCW_EN_EMIO_ENET1 {0} \
     CONFIG.PCW_EN_ENET0 {1} \
-    CONFIG.PCW_EN_ENET1 {1} \
+    CONFIG.PCW_EN_ENET1 {0} \
     CONFIG.PCW_EN_QSPI {1} \
     CONFIG.PCW_EN_SDIO0 {1} \
     CONFIG.PCW_EN_UART1 {1} \
+    CONFIG.PCW_FCLK_CLK1_BUF {TRUE} \
     CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {200} \
+    CONFIG.PCW_FPGA1_PERIPHERAL_FREQMHZ {125} \
     CONFIG.PCW_FPGA_FCLK0_ENABLE {1} \
+    CONFIG.PCW_FPGA_FCLK1_ENABLE {1} \
     CONFIG.PCW_MIO_1_IOTYPE {LVCMOS 3.3V} \
     CONFIG.PCW_MIO_1_PULLUP {enabled} \
     CONFIG.PCW_MIO_1_SLEW {slow} \
@@ -341,19 +363,30 @@ proc create_root_design { parentCell } {
 
 
   # Create interface connections
+  connect_bd_intf_net -intf_net GMII_0_1 [get_bd_intf_ports GMII_0] [get_bd_intf_pins gmii_to_rgmii_0/GMII]
+  connect_bd_intf_net -intf_net GMII_1_1 [get_bd_intf_ports GMII_1] [get_bd_intf_pins gmii_to_rgmii_1/GMII]
+  connect_bd_intf_net -intf_net MDIO_GEM_0_1 [get_bd_intf_ports MDIO_GEM_0] [get_bd_intf_pins gmii_to_rgmii_0/MDIO_GEM]
+  connect_bd_intf_net -intf_net MDIO_GEM_1_1 [get_bd_intf_ports MDIO_GEM_1] [get_bd_intf_pins gmii_to_rgmii_1/MDIO_GEM]
   connect_bd_intf_net -intf_net gmii_to_rgmii_0_MDIO_PHY [get_bd_intf_ports MDIO_PHY_0] [get_bd_intf_pins gmii_to_rgmii_0/MDIO_PHY]
   connect_bd_intf_net -intf_net gmii_to_rgmii_0_RGMII [get_bd_intf_ports RGMII_0] [get_bd_intf_pins gmii_to_rgmii_0/RGMII]
   connect_bd_intf_net -intf_net gmii_to_rgmii_1_MDIO_PHY [get_bd_intf_ports MDIO_PHY_1] [get_bd_intf_pins gmii_to_rgmii_1/MDIO_PHY]
   connect_bd_intf_net -intf_net gmii_to_rgmii_1_RGMII [get_bd_intf_ports RGMII_1] [get_bd_intf_pins gmii_to_rgmii_1/RGMII]
   connect_bd_intf_net -intf_net processing_system7_0_DDR [get_bd_intf_ports DDR] [get_bd_intf_pins processing_system7_0/DDR]
   connect_bd_intf_net -intf_net processing_system7_0_FIXED_IO [get_bd_intf_ports FIXED_IO] [get_bd_intf_pins processing_system7_0/FIXED_IO]
-  connect_bd_intf_net -intf_net processing_system7_0_GMII_ETHERNET_0 [get_bd_intf_pins gmii_to_rgmii_0/GMII] [get_bd_intf_pins processing_system7_0/GMII_ETHERNET_0]
-  connect_bd_intf_net -intf_net processing_system7_0_GMII_ETHERNET_1 [get_bd_intf_pins gmii_to_rgmii_1/GMII] [get_bd_intf_pins processing_system7_0/GMII_ETHERNET_1]
-  connect_bd_intf_net -intf_net processing_system7_0_MDIO_ETHERNET_0 [get_bd_intf_pins gmii_to_rgmii_0/MDIO_GEM] [get_bd_intf_pins processing_system7_0/MDIO_ETHERNET_0]
-  connect_bd_intf_net -intf_net processing_system7_0_MDIO_ETHERNET_1 [get_bd_intf_pins gmii_to_rgmii_1/MDIO_GEM] [get_bd_intf_pins processing_system7_0/MDIO_ETHERNET_1]
+  connect_bd_intf_net -intf_net processing_system7_0_GMII_ETHERNET_0 [get_bd_intf_ports GMII_ETHERNET_0_0] [get_bd_intf_pins processing_system7_0/GMII_ETHERNET_0]
+  connect_bd_intf_net -intf_net processing_system7_0_MDIO_ETHERNET_0 [get_bd_intf_ports MDIO_ETHERNET_0_0] [get_bd_intf_pins processing_system7_0/MDIO_ETHERNET_0]
 
   # Create port connections
-  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins gmii_to_rgmii_0/clkin] [get_bd_pins gmii_to_rgmii_1/clkin] [get_bd_pins processing_system7_0/FCLK_CLK0]
+  connect_bd_net -net ENET0_EXT_INTIN_0_1 [get_bd_ports ENET0_EXT_INTIN_0] [get_bd_pins processing_system7_0/ENET0_EXT_INTIN]
+  connect_bd_net -net gmii_to_rgmii_0_clock_speed [get_bd_pins gmii_to_rgmii_0/clock_speed] [get_bd_ports clock_speed_1]
+  connect_bd_net -net gmii_to_rgmii_0_link_status [get_bd_pins gmii_to_rgmii_0/link_status] [get_bd_ports link_status_0]
+  connect_bd_net -net gmii_to_rgmii_0_speed_mode [get_bd_pins gmii_to_rgmii_0/speed_mode] [get_bd_ports speed_mode_0]
+  connect_bd_net -net gmii_to_rgmii_1_clock_speed [get_bd_pins gmii_to_rgmii_1/clock_speed] [get_bd_ports clock_speed_0]
+  connect_bd_net -net gmii_to_rgmii_1_link_status [get_bd_pins gmii_to_rgmii_1/link_status] [get_bd_ports link_status_1]
+  connect_bd_net -net gmii_to_rgmii_1_speed_mode [get_bd_pins gmii_to_rgmii_1/speed_mode] [get_bd_ports speed_mode_1]
+  connect_bd_net -net processing_system7_0_FCLK_CLK0 [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins gmii_to_rgmii_0/clkin] [get_bd_pins gmii_to_rgmii_1/clkin]
+  connect_bd_net -net processing_system7_0_FCLK_CLK1 [get_bd_pins processing_system7_0/FCLK_CLK1] [get_bd_ports FCLK_CLK1_125]
+  connect_bd_net -net processing_system7_0_FCLK_RESET0_N [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_ports RESETn_PHY_0]
 
   # Create address segments
 

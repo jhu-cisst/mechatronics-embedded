@@ -16,6 +16,7 @@
 #   - CONFIG_SRC         Source config
 #   - BSP_CFG_SRC        Source bsp.cfg
 #   - DEVICE_TREE_FILES  List of device tree files
+#   - RECIPES_CORE_SRC_DIR  Directory for recipes-core (optional)
 #
 # Description:
 #   This function creates the petalinux project. The CONFIG_SRC file (config) is copied to
@@ -35,6 +36,13 @@
 #   directories in the build tree.
 #   Note that this function only updates the "config" and "bsp.cfg" files;
 #   the "rootfs_config" is updated in petalinux_app_create and petalinux_build.
+#
+#   The RECIPES_CORE_SRC_DIR parameter is optional. If specified, the entire directory is
+#   copied from the source tree to the build tree. One limitation of the current implementation
+#   is that "cmake -E copy_directory" updates the file times and thus we do not have a dependency
+#   on modifications to the source files. This means that if any of the recipes-core files
+#   are changed, the easiest solution is to delete the file config.cfg in the build tree,
+#   which will force the directory to be copied.
 #
 ##########################################################################################
 #
@@ -68,6 +76,8 @@
 #   - CONFIG_MENU        ON --> show config menus (default is OFF)
 #   - ROOTFS_CONFIG_SRC  Source rootfs_config
 #   - BIT_FILE           BIT file to use for boot image (optional)
+#   - FSBL_FILE          FSBL file (elf) to use for boot image (optional, default is
+#                        zynq_fsbl.elf in petalinux image directory)
 #   - DEPENDENCIES       Build dependencies
 #
 # Description:
@@ -151,7 +161,8 @@ function (petalinux_create ...)
        CONFIG_MENU
        CONFIG_SRC
        BSP_CFG_SRC
-       DEVICE_TREE_FILES)
+       DEVICE_TREE_FILES
+       RECIPES_CORE_SRC_DIR)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -238,6 +249,14 @@ function (petalinux_create ...)
         # if one of the hw-description entries is updated).
         DEPENDS ${PETALINUX_CREATE_OUTPUT} ${HW_FILE} ${CONFIG_SRC})
 
+    set (RECIPES_CORE_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-core")
+
+    if (RECIPES_CORE_SRC_DIR)
+        set (RECIPES_CORE_CMD "copy_directory")
+    else ()
+        set (RECIPES_CORE_CMD "true")
+    endif()
+
     # Output from configuring kernel
     set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.cfg")
 
@@ -248,6 +267,11 @@ function (petalinux_create ...)
                   ARGS -E copy_if_different
                   ${BSP_CFG_SRC}
                   ${KERNEL_CFG_DIR}
+        # Copy the recipes-core directory (if specified above)
+        COMMAND ${CMAKE_COMMAND}
+                ARGS -E ${RECIPES_CORE_CMD}
+                ${RECIPES_CORE_SRC_DIR}
+                ${RECIPES_CORE_BIN_DIR}
         # Copy the device-tree file if needed
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
@@ -399,6 +423,7 @@ function (petalinux_build ...)
        CONFIG_MENU
        ROOTFS_CONFIG_SRC
        BIT_FILE
+       FSBL_FILE
        DEPENDENCIES)
 
   # reset local variables
@@ -478,6 +503,12 @@ function (petalinux_build ...)
         DEPENDS ${PETALINUX_ROOTFS_OUTPUT} ${DEPENDENCIES})
 
     # Package the boot files
+    if (FSBL_FILE)
+      set (MSG_FSBL "custom FSBL")
+    else ()
+      set (FSBL_FILE ${PETALINUX_FSBL_FILE})
+      set (MSG_FSBL "default FSBL")
+    endif ()
 
     # Output of petalinux-package
     set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
@@ -486,20 +517,20 @@ function (petalinux_build ...)
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE} --fpga ${BIT_FILE}
+          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE} --fpga ${BIT_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
-          COMMENT "Petalinux package (boot image)"
-          DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
+          COMMENT "Petalinux package (boot image), ${MSG_FSBL}"
+          DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
     else ()
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${PETALINUX_FSBL_FILE}
+          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
-          COMMENT "Petalinux package (boot image) without BIT file"
+          COMMENT "Petalinux package (boot image) without BIT file, ${MSG_FSBL}"
                 "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs"
-          DEPENDS ${PETALINUX_IMAGE_UB} ${PETALINUX_FSBL_FILE} ${PETALINUX_UBOOT_FILE})
+          DEPENDS ${PETALINUX_IMAGE_UB} ${FSBL_FILE} ${PETALINUX_UBOOT_FILE})
 
     endif ()
 
@@ -575,6 +606,8 @@ function (petalinux_build_sdk)
     add_custom_command (
         OUTPUT ${PETALINUX_SH_FILE}
         COMMAND petalinux-build --sdk
+        # Update file time, in case it was not regenerated
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${PETALINUX_SH_FILE}
         # Set WORKING_DIRECTORY to Petalinux project subdirectory
         WORKING_DIRECTORY ${PROJ_NAME}
         COMMENT "Building Petalinux SDK"

@@ -20,6 +20,15 @@ The top-level CMake file (CMakeLists.txt) in this directory contains options `US
 `USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
 option is only supported on Linux because the Xilinx Petalinux tool is only available on Linux.
 
+The current setup requires the software to be built from a git working tree (i.e., created by
+`git clone`) because it uses the `git` command line program to retrieve version information
+(i.e., using `git describe`).
+
+The CMake dependency checking is not perfect, so sometimes it is necessary to either start with
+a clean build tree, or to manually force certain subprojects to be rebuilt. Many subprojects create a
+`cmake.copy` file in the build tree and deleting this file will cause the subproject to be rebuilt.
+Similarly, deleting `petalinux/images/linux/image.ub` will cause the kernel image to be rebuilt.
+
 ## Build Process
 
 1. Use Vivado to create the Xilinx Support Archive (XSA) file, which describes the hardware design,
@@ -35,7 +44,7 @@ There are two supported platforms (and domains):
 
    2. Linux (`platform_linux`): This platform/domain is for applications that run on the Petalinux system. Although it is possible to add Linux applications to the Petalinux build (see below), it is usually more convenient to develop them here. It is recommended to use the petalinux-generated sysroot (see `fpgav3-sysroot-cortexa9.zip` below) rather than the default sysroot.
 
-3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above. The source files are in the `petalinux` sub-directory.
+3. Use Petalinux to build a Linux image and package it for deployment (e.g., via the MicroSD card). It is possible to add applications to the Linux image, though in most cases it would be more convenient to build them with Vitis, using the Linux platform/domain described  above, or to cross-compile them as documented in the `cross_compile` subdirectory. The source files are in the `petalinux` sub-directory.
 
 ## Output Files
 
@@ -59,19 +68,15 @@ The `fpgav3-micro-sd.zip` file contains the following files, which are also avai
 
 Note that the `fpgav3init` application compiled with the Linux kernel will autorun at startup, detect the connected board and then load the appropriate firmware (`bit` file). It will also copy `qspi-boot.bin` to the first partition in the flash, if not already there.
 
+## Deploying to MicroSD card
+
+The contents of fpgav3-micro-sd.zip should be extracted to a FAT32 partition on the MicroSD card used with FPGA V3.
+Note that for MicroSD cards greater than 32 GB, it may be difficult to format as FAT32; for example, Windows
+only provides the option to format as exFAT or NTFS.
+
 ## Release Notes
 
-  * Rev 1.0.1 (November 27, 2023)
-    * Create toolchain files to cross-compile with Vitis or clang
-    * Support use of sysroot from GitHub release
-    * Added EMIO_GetVerbose and EMIO_SetVerbose methods
-    * Implemented real-time block read and write of FPGA registers via EMIO
-    * ESPM Firmware Version 2, which improves reliability of reading instrument id
-
-  * Rev 1.0.0 (August 10, 2023)
-    * Initial Release
-    * Uses Firmware Rev 8
-    * Output files built with Xilinx 2023.1 tools on Ubuntu 20.04
+  * See [GitHub Releases](https://github.com/jhu-cisst/mechatronics-embedded/releases)
 
 ## Xilinx Tool Version Dependencies
 
@@ -81,9 +86,7 @@ Following are the dependencies on the Xilinx tool versions (2022.2, 2023.1):
 difference between the TCL files exported by 2022.2 and 2023.1, so the current solution is to replace the version string while copying the file from
 the source tree to the build tree. A different solution may be necessary if there are more substantive changes in future Vivado versions.
 
-* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.1). Furthermore,
-both library versions require a patch to the file `xemacpsif_physpeed.c` to handle the RTL8211F PHY. Other Vitis versions will attempt to use the
-2023.1 files, which may fail (e.g., if the lwip version is different).
+* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.1). Other Vitis versions will attempt to use the 2023.1 files, which may fail (e.g., if the lwip version is different).
 
 * **platform_linux (Vitis)**: no differences.
 
@@ -103,3 +106,15 @@ the CMake GUI.
 
 Petalinux 2022.2 and 2023.1 specify that the following packages should be installed (`apt-get install`):
 iproute2 gawk python3 python build-essential gcc git make net-tools libncurses5-dev tftpd zlib1g-dev libssl-dev flex bison libselinux1 gnupg wget git-core diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib automake zlib1g:i386 screen pax gzip cpio python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3
+
+## Building on Windows
+
+Building on Windows is not officially supported, although both Vivado and Vitis are available and thus it should be possible to build everything except Petalinux.
+
+We have not had success, however, running Vitis from Visual Studio, even when disabling parallel builds (e.g., in Visual Studio, Tools...Options...Projects and Solutions...Build and Run...maximum number of parallel project == 1).
+
+In addition, although the cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created, they currently are not functional.
+
+## Building on OS X
+
+None of the Xilinx tools are available on Mac OS X and therefore it is only possible to cross-compile. In particular, `clang` is well supported on OS X and can be used to cross-compile the custom fpgav3 library and apps used with Petalinux. See the `cross_compile` subdirectory for more information.

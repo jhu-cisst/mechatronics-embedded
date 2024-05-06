@@ -10,6 +10,9 @@
  * 16 bits for the read/write address and the same 32 bits for the read/write data.
  * The address bus is always output from the PS, whereas the data bus is bidirectional
  * (PS input when reading, PS output when writing).
+ *
+ * This file defines the base class, EMIO_Interface. See the two derived classes,
+ * EMIO_Interface_Gpiod and EMIO_Interface_Mmap.
  */
 
 #ifndef FPGAV3_EMIO_H
@@ -17,107 +20,123 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 
-#ifdef __cplusplus
-extern "C" {
+#ifdef USE_TIMEOFDAY
+typedef struct timeval fpgav3_time_t;
+#else
+typedef struct timespec fpgav3_time_t;
 #endif
 
-// Forward declaration
-struct EMIO_Info;
-
-// EMIO_Init
-//
-//   Initializes EMIO to provide an interface to the internal read and write buses
-//   on the FPGA. Returns 0 (null pointer) on failure.
-struct EMIO_Info *EMIO_Init();
-
-// Release the resources allocated by EMIO_Init
-void EMIO_Release(struct EMIO_Info *info);
-
-// Get/Set verbose flag (true -> prints messages when waiting for FPGA I/O to complete)
-bool EMIO_GetVerbose(struct EMIO_Info *info);
-void EMIO_SetVerbose(struct EMIO_Info *info, bool newState);
-
-// EMIO_ReadQuadlet
-//   Reads a quadlet (32-bit register) from the FPGA.
-// Parameters:
-//     addr  16-bit register address
-//     data  pointer to location for storing 32-bit data
-// Returns:  true if success
-bool EMIO_ReadQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t *data);
-
-// EMIO_WriteQuadlet
-//   Writes a quadlet (32-bit register) to the FPGA.
-// Parameters:
-//     addr  16-bit register address
-//     data  32-bit value to write
-// Returns:  true if success
-bool EMIO_WriteQuadlet(struct EMIO_Info *info, uint16_t addr, uint32_t data);
-
-// EMIO_ReadBlock
-//   Reads a block of 32-bit data from the FPGA. This implementation makes multiple
-//   calls to EMIO_ReadQuadlet.
-// Parameters:
-//     addr   16-bit register address
-//     data   pointer to location for storing 32-bit data
-//     nBytes number of bytes to read (rounds up to multiple of 4)
-// Returns:  true if success
-bool EMIO_ReadBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes);
-
-// EMIO_WriteBlock
-//   Write a block of 32-bit data to the FPGA. This temporary implementation makes multiple
-//   calls to EMIO_WriteQuadlet, which does not issue all block write signals, such as
-//   blk_wstart and blk_wen.
-// Parameters:
-//     addr   16-bit register address
-//     data   pointer to location that contains 32-bit data
-//     nBytes number of bytes to write (rounds up to multiple of 4)
-// Returns:  true if success
-bool EMIO_WriteBlock(struct EMIO_Info *info, uint16_t addr, uint32_t *data, unsigned int nBytes);
-
-// EMIO_WritePromData
-//   Writes the specified bytes to the PROM registers on the FPGA
-//   (this is intended to be used to copy the FPGA S/N to the PROM).
-// Parameters:
-//     data    pointer to data
-//     nBytes  number of data bytes (will be rounded up to multiple of 4)
-// Returns:    true if success
-bool EMIO_WritePromData(struct EMIO_Info *info, char *data, unsigned int nBytes);
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
-#ifdef __cplusplus
 class EMIO_Interface
 {
+protected:
 
-    EMIO_Info *info;
+    bool isInput;              // true if data lines are input
+    bool isVerbose;            // true if error messages should be printed
+    bool useEvents;            // true if using events to wait
+    unsigned int doTiming;     // timing mode (0, 1 or 2)
+    unsigned int version;      // Version from FPGA
+    fpgav3_time_t startTime;   // Start time for measurement
+    fpgav3_time_t endTime;     // End time for measurement
+    double timingOverhead;     // Overhead due to timing calls
+    double timeout_us;         // Timeout in microseconds
 
-public:
+ public:
 
-    EMIO_Interface()
-    { info = EMIO_Init(); }
+    EMIO_Interface() : isInput(true), isVerbose(false), useEvents(false), doTiming(0),
+                       version(0), timingOverhead(0.0), timeout_us(250.0)
+    {}
 
-    ~EMIO_Interface()
-    { EMIO_Release(info); }
+    virtual ~EMIO_Interface()
+    {}
 
-    bool GetVerbose()
-    { return EMIO_GetVerbose(info); }
+    // Returns true if successfully initialized
+    virtual bool IsOK() const = 0;
+
+    // Get bus interface version number
+    virtual unsigned int GetVersion() const
+    { return version; }
+
+    // Get/Set verbose flag (true -> prints messages when waiting for FPGA I/O to complete)
+    bool GetVerbose() const
+    { return isVerbose; }
 
     void SetVerbose(bool newState)
-    { EMIO_SetVerbose(info, newState); }
+    { isVerbose = newState; }
 
-    bool ReadQuadlet(uint16_t addr, uint32_t &data)
-    { return EMIO_ReadQuadlet(info, addr, &data); }
+    // Get/Set timeout value in microseconds
+    double GetTimeout_us() const
+    { return timeout_us; }
 
-    bool WriteQuadlet(uint16_t addr, uint32_t data)
-    { return EMIO_WriteQuadlet(info, addr, data); }
+    void SetTimeout_us(double new_timeout_us)
+    { timeout_us = new_timeout_us; }
 
-    bool WritePromData(char *data, unsigned int nBytes)
-    { return EMIO_WritePromData(info, data, nBytes); }
+    // Get/Set timing mode (true -> measure timing info)
+    //   0 --> no timing
+    //   1 --> only total time
+    //   2 --> total and intermediate times
+    unsigned int GetTimingMode() const
+    { return doTiming; }
+
+    void SetTimingMode(unsigned int newState);
+
+    // Get/Set event flag (true -> use events instead of polling)
+    bool GetEventMode() const
+    { return useEvents; }
+
+    virtual void SetEventMode(bool newState)
+    { useEvents = newState; }
+
+    // ReadQuadlet
+    //   Reads a quadlet (32-bit register) from the FPGA.
+    // Parameters:
+    //     addr  16-bit register address
+    //     data  pointer to location for storing 32-bit data
+    // Returns:  true if success
+    virtual bool ReadQuadlet(uint16_t addr, uint32_t &data) = 0;
+
+    // WriteQuadlet
+    //   Writes a quadlet (32-bit register) to the FPGA.
+    // Parameters:
+    //     addr  16-bit register address
+    //     data  32-bit value to write
+    // Returns:  true if success
+    virtual bool WriteQuadlet(uint16_t addr, uint32_t data) = 0;
+
+    // ReadBlock
+    //   Reads a block of 32-bit data from the FPGA.
+    // Parameters:
+    //     addr   16-bit register address
+    //     data   pointer to location for storing 32-bit data
+    //     nBytes number of bytes to read (rounds up to multiple of 4)
+    // Returns:  true if success
+    virtual bool ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes) = 0;
+
+    // WriteBlock
+    //   Write a block of 32-bit data to the FPGA.
+    // Parameters:
+    //     addr   16-bit register address
+    //     data   pointer to location that contains 32-bit data
+    //     nBytes number of bytes to write (rounds up to multiple of 4)
+    // Returns:  true if success
+    virtual bool WriteBlock(uint16_t addr, const uint32_t *data, unsigned int nBytes) = 0;
+
+    // EMIO_WritePromData
+    //   Writes the specified bytes to the PROM registers on the FPGA
+    //   (this is intended to be used to copy the FPGA S/N to the PROM).
+    // Parameters:
+    //     data    pointer to data
+    //     nBytes  number of data bytes (will be rounded up to multiple of 4)
+    // Returns:    true if success
+    bool WritePromData(char *data, unsigned int nBytes);
+
+protected:
+
+    // Local methods for timing measurements
+    static void GetCurTime(fpgav3_time_t *curTime);
+    static double TimeDiff_us(fpgav3_time_t *startTime, fpgav3_time_t *endTime);
 
 };
-#endif
 
 #endif // FPGAV3_EMIO_H

@@ -6,10 +6,6 @@
 
 #include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Serial number format is 1234-56 or 1234-567, so maximum length (including null
 // termination) is 9 bytes.
 const size_t FPGA_SN_SIZE = 9;
@@ -34,9 +30,5 @@ bool ProgramFpgaSerialNumber(const char *sn);
 //   in the flash partition.
 
 bool ProgramFlash(const char *fileName, const char *devName);
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif  // FPGAV3_QSPI_H

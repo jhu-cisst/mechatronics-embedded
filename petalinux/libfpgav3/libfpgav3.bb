@@ -10,9 +10,16 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI = "file://fpgav3_emio.h \
-           file://fpgav3_emio.c \
+           file://fpgav3_emio.cpp \
+           file://fpgav3_emio_gpiod.h \
+           file://fpgav3_emio_gpiod.cpp \
+           file://fpgav3_emio_mmap.h \
+           file://fpgav3_emio_mmap.cpp \
            file://fpgav3_qspi.h \
-           file://fpgav3_qspi.c \
+           file://fpgav3_qspi.cpp \
+           file://fpgav3_version.h \
+           file://fpgav3_lib.h \
+           file://fpgav3_lib.cpp \
 	   file://Makefile \
           "
 
