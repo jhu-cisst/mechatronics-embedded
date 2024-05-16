@@ -7,7 +7,7 @@ else (BUILD_FPGAV30)
   set (PLATFORM_STANDALONE "FpgaV31Standalone")
 endif (BUILD_FPGAV30)
 
-# Vitis 2022.x uses lwip211. Vitis 2023.1 uses lwip213.
+# Vitis 2022.x uses lwip211. Vitis 2023.x uses lwip213.
 if (Vitis_VERSION_MAJOR EQUAL 2022)
   set (LWIP_LIB "lwip211")
 else ()

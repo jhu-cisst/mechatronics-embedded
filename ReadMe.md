@@ -5,7 +5,7 @@ This repository contains the embedded software for the Zynq 7000 SoC used in the
 The build process is implemented using CMake to invoke the Xilinx build tools, including
 Vivado, Vitis and (on Linux only) Petalinux.
 It has been tested with Vivado/Vitis 2022.2 and 2023.1 on Windows 10 (with Visual Studio 2017) and
-with Vivado/Vitis/Petalinux 2022.2 and 2023.1 on Ubuntu 20.04 (see below).
+with Vivado/Vitis/Petalinux 2022.2, 2023.1 and 2023.2 on Ubuntu 20.04 or 22.04 (see below).
 
 The Zynq 7000 SoC contains both a processor (PS) and FGPA (programmable logic, PL).
 The code in this repository targets the PS. The PL firmware, which is written in Verilog,
@@ -80,32 +80,36 @@ only provides the option to format as exFAT or NTFS.
 
 ## Xilinx Tool Version Dependencies
 
-Following are the dependencies on the Xilinx tool versions (2022.2, 2023.1):
+Following are the dependencies on the Xilinx tool versions (2022.2, 2023.1, 2023.2):
 
 * **block_design (Vivado)**: the exported TCL file, `exported-block-v31.tcl`, contains the Vivado version string ("2022.2"). This is the only substantive
-difference between the TCL files exported by 2022.2 and 2023.1, so the current solution is to replace the version string while copying the file from
+difference between the TCL files exported by 2022.2, 2023.1 and 2023.2, so the current solution is to replace the version string while copying the file from
 the source tree to the build tree. A different solution may be necessary if there are more substantive changes in future Vivado versions.
 
-* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.1). Other Vitis versions will attempt to use the 2023.1 files, which may fail (e.g., if the lwip version is different).
+* **platform_standalone (Vitis)**: the light-weight IP (lwip) library versions are different (lwip211 for 2022.x and lwip213 for 2023.x). Other Vitis versions will attempt to use the 2023.x files, which may fail (e.g., if the lwip version is different).
 
 * **platform_linux (Vitis)**: no differences.
 
-* **petalinux (Petalinux)**: the `config` and `rootfs_config` files are version-specific and are located in 2022.2 and 2023.1 subdirectories of
-the `configs` subdirectory. Other Petalinux versions will use the 2023.1 files, with the expectation that a new subdirectory will subsequently be
-created. The `bsp.cfg` file is currently not version-specific.
+* **petalinux (Petalinux)**: the `config` and `rootfs_config` files are version-specific (though differences are minor) and are located in 2022.2, 2023.1 and 2023.2 subdirectories of
+the `configs` subdirectory. Other Petalinux versions will use the 2023.2 files, with the expectation that a new subdirectory will subsequently be
+created. The `bsp.cfg` file is currently not version-specific (and not used).
 
-## Building on Ubuntu 20.04
+## Building on Ubuntu 20.04 / 22.04
 
 It is necessary to install `libtinfo5`, e.g., `sudo apt install libtinfo5` in addition
 to the usual development tools.
 
-Vitis 2022.2 and 2023.1 already contain CMake V3.3.2, which is used if the Xilinx
+Vitis 2022.2, 2023.1 and 2023.2 already contain CMake V3.3.2, which is used if the Xilinx
 `settings64.sh` file is sourced before calling CMake. Note that it is not necessary to
 source `settings64.sh`, as long as the paths to Vivado and Vitis (xcst) are specified via
 the CMake GUI.
 
-Petalinux 2022.2 and 2023.1 specify that the following packages should be installed (`apt-get install`):
+Petalinux 2022.2, 2023.1 and 2023.2 specify that the following packages should be installed (`apt-get install`):
 iproute2 gawk python3 python build-essential gcc git make net-tools libncurses5-dev tftpd zlib1g-dev libssl-dev flex bison libselinux1 gnupg wget git-core diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib automake zlib1g:i386 screen pax gzip cpio python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3
+
+Ubuntu 20.04 and 22.04 use git instead of git-core and pylint instead of pylint3.
+
+Note: Not all of the above packages are really needed.
 
 ## Building on Windows
 
