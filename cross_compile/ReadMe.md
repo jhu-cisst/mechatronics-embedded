@@ -6,7 +6,7 @@ Linux system, such as `/usr/include` and `/usr/lib`. This allows you to link aga
 the standard Linux libraries, as well as libraries specific to FPGA V3 (e.g., `libfpgav3.so`).
 
 The toolchain file is created by following the instructions in Part 1 below. The sysroot file, called
-`fpgav3-sysroot-cortexa9.zip` is obtained from
+`fpgav3-sysroot-cortexa9.zip`, is obtained from
 [GitHub Releases](https://github.com/jhu-cisst/mechatronics-embedded/releases).
 Generally, rather than downloading the ZIP file yourself, it is better to allow the system to automatically
 download it, as described below.
@@ -33,13 +33,13 @@ ccmake ../source
 3. Set CMake options during configuration
 
    * USE_PETALINUX_SYSROOT should be ON
-     * Note that this will create a CMake option called `PETALINUX_SYSROOT_EXTERNAL`, which by default will be set to download the latest sysroot; this can be changed to download a different sysroot, or use one that has already been downloaded
+     * Note that this will create a CMake option called PETALINUX_SYSROOT_EXTERNAL, which by default will be set to download the latest sysroot; this can be changed to download a different sysroot, or use one that has already been downloaded
    * USE_VITIS should be ON if you wish to use gcc provided by Vitis; otherwise it can be OFF
    * All other options can be OFF
 
 4. Generate project in CMake to create the toolchain files:
 
-   * `toolchain_vitis_fpgav3.cmake` -- if USE_VITIS was ON
+   * `toolchain_vitis_fpgav3.cmake`  (if USE_VITIS is ON)
    * `toolchain_clang_fpgav3.cmake`
 
 5. Build the project (e.g., `make`) to automatically download (and unzip) the sysroot
@@ -59,8 +59,9 @@ cd appbuild
 ```
 cmake -DCMAKE_TOOLCHAIN_FILE=<toolchain-file> <path-to-source>
 ```
+
    * `<toolchain-file>` is the toolchain file (for VITIS/gcc or clang) created in Part 1
-   * `<path-to-source>` is the path to your application source code (i.e., top-level `CMakeLists.txt`)
+   * `<path-to-source>` is the path to your application source code (i.e., your top-level `CMakeLists.txt`)
 
 3. Configure your project in CMake (as normal)
 
@@ -85,11 +86,11 @@ The top-level `CMakeLists.txt` automatically completes the first two steps in Pa
 
 1. It creates the following two sub-directories in the build tree, where `cc_vitis` and `cc_clang` correspond to the `appbuild` directory:
 
-  * `cc_vitis`:  for cross-compiling with Vitis (gcc), assuming USE_VITIS is ON
-  * `cc_clang`:  for cross-compiling with clang
+   * `cc_vitis`:  for cross-compiling with Vitis (gcc), assuming USE_VITIS is ON
+   * `cc_clang`:  for cross-compiling with clang
 
 2. It invokes `cmake` with the correct parameters
-  * Note that it does **not** use `add_subdirectory(cross_compile)`, since the toolchain file has to be specified when calling `cmake`.
+   * Note that it does **not** use `add_subdirectory(cross_compile)`, since the toolchain file has to be specified when calling `cmake`.
 
 After running CMake in the top-level project (and `make` to download the sysroot), it is only necessary to change to one of the above
 sub-directories and type `make` (or the appropriate build command for the platform).
