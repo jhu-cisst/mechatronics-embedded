@@ -61,7 +61,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=<toolchain-file> <path-to-source>
 ```
 
    * `<toolchain-file>` is the toolchain file (for VITIS/gcc or clang) created in Part 1
-   * `<path-to-source>` is the path to your application source code (i.e., your top-level `CMakeLists.txt`)
+   * `<path-to-source>` is the path to your application source code (i.e., your top-level CMakeLists.txt)
 
 3. Configure your project in CMake (as normal)
 
@@ -74,15 +74,15 @@ it is best to delete the build tree and start over.
 
 **Note:** If you wish to compile your own application, you can ignore this section.
 
-The top-level `CMakeLists.txt` (in the parent directory) automatically performs most of Part 2 for the specific case
-of separately cross-compiling the FPGA V3 libraries and applications (source code in `petalinux` directory)
+The top-level [CMakeLists.txt](/CMakeLists.txt) (in the parent directory) automatically performs most of Part 2 for the specific case
+of separately cross-compiling the FPGA V3 libraries and applications (source code in [petalinux](/petalinux) subdirectory)
 using either of the two supported cross-compiling toolchains: Vitis (gcc) or clang.
 
-The `CMakeLists.txt` in this directory specifies how to compile the FPGA V3 libraries and applications (from source
-files in the `petalinux` directory); it is analogous to the `CMakeLists.txt` that would exist in the application
+The [CMakeLists.txt](/cross_compile/CMakeLists.txt) in this directory specifies how to compile the FPGA V3 libraries and applications (from source
+files in the [petalinux](/petalinux) subdirectory); it is analogous to the CMakeLists.txt that would exist in the application
 that you wish to cross-compile.
 
-The top-level `CMakeLists.txt` automatically completes the first two steps in Part 2 above:
+The top-level CMakeLists.txt automatically completes the first two steps in Part 2 above:
 
 1. It creates the following two sub-directories in the build tree, where `cc_vitis` and `cc_clang` correspond to the `appbuild` directory:
 
