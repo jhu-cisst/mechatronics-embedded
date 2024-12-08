@@ -299,6 +299,7 @@ bool FpgaV3_Init_QSPI()
         if (board_status&0x00400000) xil_printf(", QLA");
         if (board_status&0x00200000) xil_printf(", DQLA");
         if (board_status&0x00100000) xil_printf(", DRAC");
+        if (board_status&0x00002000) xil_printf(", TEST");
         // Check for V3.0 takes some time, so not valid yet
         // if (board_status&0x00080000) xil_printf(", V3.0");
         xil_printf("\r\n");
