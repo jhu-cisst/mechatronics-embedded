@@ -31,9 +31,9 @@
 #include <fpgav3_lib.h>
 
 // Detected board type
-enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
-std::string BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
-std::string FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
+enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST };
+std::string BoardName[6] = { "Unknown", "None", "QLA", "DQLA", "DRAC", "TEST" };
+std::string FirmwareName[6] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC", "" };
 
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
@@ -292,8 +292,10 @@ int main(int argc, char **argv)
     std::cout << "Status reg: " << std::hex << std::setw(8) << std::setfill('0')
               << reg_status << std::dec << std::endl;
     unsigned int board_id = (reg_status&0x0f000000)>>24;
-    // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC
+    // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST
     unsigned int board_mask = (reg_status & 0x00f00000)>>20;
+    // check for TEST board
+    if (reg_status & 0x00002000) board_mask |= 0x10;
     bool isV30 = (reg_status&0x00080000);
 
     if (isV30)
@@ -301,14 +303,16 @@ int main(int argc, char **argv)
 
     enum BoardType board_type;
     switch (board_mask) {
-        case 8: board_type = BOARD_NONE;
-                break;
-        case 4: board_type = BOARD_QLA;
-                break;
-        case 2: board_type = BOARD_DQLA;
-                break;
-        case 1: board_type = BOARD_DRAC;
-                break;
+        case 0x10: board_type = BOARD_TEST;
+                   break;
+        case 0x08: board_type = BOARD_NONE;
+                   break;
+        case 0x04: board_type = BOARD_QLA;
+                   break;
+        case 0x02: board_type = BOARD_DQLA;
+                   break;
+        case 0x01: board_type = BOARD_DRAC;
+                   break;
         default:
                 board_type = BOARD_UNKNOWN;
     }
