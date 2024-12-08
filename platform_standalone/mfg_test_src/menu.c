@@ -20,6 +20,7 @@ extern char inbyte();
 bool TestBoardID();
 bool TestQSPI();
 bool TestMemory();
+bool TestPROM();
 bool TestIO();
 
 void menu()
@@ -63,8 +64,9 @@ void menu()
         printf("1) Test board id\r\n");
         printf("2) Test QSPI\r\n");
         printf("3) Test memory\r\n");
+        printf("4) Test SPI PROM\r\n");
         if (isTestBoard)
-            printf("4) Test I/O\r\n");
+            printf("5) Test I/O\r\n");
         printf("Enter selection:\r\n");
 
         option = inbyte();
@@ -85,7 +87,10 @@ void menu()
         else if (option == '3') {
             TestMemory();
         }
-        else if (isTestBoard && (option == '4')) {
+        else if (option == '4') {
+            TestPROM();
+        }
+        else if (isTestBoard && (option == '5')) {
             TestIO();
         }
     }   
@@ -143,6 +148,80 @@ bool TestQSPI()
     if (ret) printf("QSPI Test PASS\r\n\r\n");
     else printf("QSPI Test FAIL\r\n\r\n");
     return ret;
+}
+
+// Firmware registers addresses for access to 25AA128 PROM.
+// Note that these would need to be updated for DQLA firmware.
+const uint16_t reg_prom_cmd    = 0x3000;
+const uint16_t reg_prom_status = 0x3001;
+const uint16_t reg_prom_result = 0x3002;
+
+// Wait for 25AA128 PROM to finish command, which is indicated
+// by the IDLE state (lowest 3 bits 0).
+// For now, just loop up to "num" times. For 25AA128 on QLA,
+// it typically takes 4-6 loops for a 1-byte command to finish.
+bool WaitPROM(const char *msg, int num)
+{
+    int i;
+    bool ret;
+
+    uint32_t prom_status = 0x7;
+    EMIO_ReadQuadlet(reg_prom_status, &prom_status);
+    ret = ((prom_status & 0x7) == 0);
+    if (!ret) {
+        for (i = 1; (i < num) && (!ret); i++) {
+            EMIO_ReadQuadlet(reg_prom_status, &prom_status);
+            ret = ((prom_status & 0x7) == 0);
+        }
+        if (!ret)
+            printf("TIMEOUT waiting for %s, status: %lx", msg, prom_status);
+#if 0
+        else
+            printf("PROM finished %s in %d of %d loops\r\n", msg, i, num);
+#endif
+    }
+    return ret;
+}
+
+// Tests 25AA128, which is normally connected via SPI to IO1[1:4]
+bool TestPROM()
+{
+    // Command values
+    uint32_t cmd_rdsr = 0x05000000;   // Read Status Register
+    uint32_t cmd_wren = 0x06000000;   // WREN (write enable)
+    uint32_t cmd_wrdi = 0x04000000;   // WRDI (write disable)
+    uint32_t prom_result;             // For reading PROM result
+    bool is_good;
+
+    // Make sure PROM in IDLE state
+    if (!WaitPROM("IDLE", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    printf("PROM status register: %lx\r\n", prom_result);
+
+    printf("Sending command to enable PROM write\r\n");
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_wren);
+    if (!WaitPROM("WREN", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    is_good = (prom_result & 0x02);
+    printf("PROM status register: %lx -- %s\r\n", prom_result, is_good ? "PASS" : "FAIL");
+
+    printf("Sending command to disable PROM write\r\n");
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_wrdi);
+    if (!WaitPROM("WRDI", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    is_good = !(prom_result & 0x02);
+    printf("PROM status register: %lx -- %s\r\n", prom_result, is_good ? "PASS" : "FAIL");
+
+    return true;
 }
 
 // Channels (see BootConfig.v)
