@@ -20,7 +20,8 @@ extern char inbyte();
 bool TestBoardID();
 bool TestQSPI();
 bool TestMemory();
-bool TestPROM();
+bool TestPROM_SR();
+bool TestPROM_Read();
 bool TestIO();
 
 void menu()
@@ -64,9 +65,11 @@ void menu()
         printf("1) Test board id\r\n");
         printf("2) Test QSPI\r\n");
         printf("3) Test memory\r\n");
-        printf("4) Test SPI PROM\r\n");
+        printf("4) Test SPI PROM Read\r\n");
         if (isTestBoard)
             printf("5) Test I/O\r\n");
+        else
+            printf("5) Test SPI PROM StatusReg\r\n");
         printf("Enter selection:\r\n");
 
         option = inbyte();
@@ -88,10 +91,13 @@ void menu()
             TestMemory();
         }
         else if (option == '4') {
-            TestPROM();
+            TestPROM_Read();
         }
-        else if (isTestBoard && (option == '5')) {
-            TestIO();
+        else if (option == '5') {
+            if (isTestBoard)
+                TestIO();
+            else
+                TestPROM_SR();
         }
     }   
     printf("Exiting\r\n");    
@@ -155,11 +161,14 @@ bool TestQSPI()
 const uint16_t reg_prom_cmd    = 0x3000;
 const uint16_t reg_prom_status = 0x3001;
 const uint16_t reg_prom_result = 0x3002;
+// Address for block read/write
+const uint16_t prom_data_block = 0x3100;
 
 // Wait for 25AA128 PROM to finish command, which is indicated
 // by the IDLE state (lowest 3 bits 0).
 // For now, just loop up to "num" times. For 25AA128 on QLA,
 // it typically takes 4-6 loops for a 1-byte command to finish.
+// Reading the QLA serial number (12 bytes) takes about 42-43 loops.
 bool WaitPROM(const char *msg, int num)
 {
     int i;
@@ -174,7 +183,7 @@ bool WaitPROM(const char *msg, int num)
             ret = ((prom_status & 0x7) == 0);
         }
         if (!ret)
-            printf("TIMEOUT waiting for %s, status: %lx", msg, prom_status);
+            printf("TIMEOUT waiting for %s, status: %lx\r\n", msg, prom_status);
 #if 0
         else
             printf("PROM finished %s in %d of %d loops\r\n", msg, i, num);
@@ -184,7 +193,13 @@ bool WaitPROM(const char *msg, int num)
 }
 
 // Tests 25AA128, which is normally connected via SPI to IO1[1:4]
-bool TestPROM()
+
+// Test PROM Status Register:
+//   Bit 1 (0x02) is the write-enable latch (WEL)
+//   Sending write enable (WREN) command should set this bit
+//   Sending write disable (WRDI) command should clear this bit
+
+bool TestPROM_SR()
 {
     // Command values
     uint32_t cmd_rdsr = 0x05000000;   // Read Status Register
@@ -192,6 +207,7 @@ bool TestPROM()
     uint32_t cmd_wrdi = 0x04000000;   // WRDI (write disable)
     uint32_t prom_result;             // For reading PROM result
     bool is_good;
+    bool ret = true;
 
     // Make sure PROM in IDLE state
     if (!WaitPROM("IDLE", 15)) return false;
@@ -209,6 +225,7 @@ bool TestPROM()
     if (!WaitPROM("RDSR", 15)) return false;
     EMIO_ReadQuadlet(reg_prom_result, &prom_result);
     is_good = (prom_result & 0x02);
+    if (!is_good) ret = false;
     printf("PROM status register: %lx -- %s\r\n", prom_result, is_good ? "PASS" : "FAIL");
 
     printf("Sending command to disable PROM write\r\n");
@@ -219,9 +236,43 @@ bool TestPROM()
     if (!WaitPROM("RDSR", 15)) return false;
     EMIO_ReadQuadlet(reg_prom_result, &prom_result);
     is_good = !(prom_result & 0x02);
-    printf("PROM status register: %lx -- %s\r\n", prom_result, is_good ? "PASS" : "FAIL");
+    if (!is_good) ret = false;
+    printf("PROM status register: %lx -- %s\r\n\r\n", prom_result, is_good ? "PASS" : "FAIL");
 
-    return true;
+    return ret;
+}
+
+// Test PROM Read from address 0
+//   On QLA/DRAC this would be the "QLA xxxx-xx" or "dRA xxxx-xx"
+//   On TEST board, this should be "MFG x.x-01 ..."
+
+bool TestPROM_Read()
+{
+    // Read 12 bytes (3 quadlets) from PROM
+    char data[13];
+    data[12] = 0;  // Make sure null-terminated
+    uint32_t write_data = 0xFE000000|2;
+    EMIO_WriteQuadlet(reg_prom_cmd, write_data);
+    if (!WaitPROM("READ", 100)) return false;
+    // true --> ReadBlock swaps bytes
+    bool ret = EMIO_ReadBlock(prom_data_block, (uint32_t *)data, 12, true);
+    if (ret) {
+        for (int i = 12; i >= 0; i--) {
+            // Starting at end of string, replace any 0xff (unprogrammed byte)
+            // with 0x00, stopping when first non-zero character encountered.
+            if (data[i] == 0xff) data[i] = 0x00;
+            else if (data[i] != 0) break;
+        }
+        if (strlen(data) == 0)
+            printf("No characters read\r\n");
+        else
+            printf("Read \"%s\"\r\n", data);
+    }
+    else
+        printf("Failed to read block\r\n");
+
+    printf("\r\n");
+    return ret;
 }
 
 // Channels (see BootConfig.v)

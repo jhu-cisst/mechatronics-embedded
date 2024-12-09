@@ -51,8 +51,9 @@ bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data);
 //     addr   16-bit register address
 //     data   pointer to location for storing 32-bit data
 //     nBytes number of bytes to read (rounds up to multiple of 4)
+//     doSwap whether or not to swap bytes (true --> compatible with PC implementation)
 // Returns:  true if success
-bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes);
+bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes, bool doSwap);
 
 // EMIO_WriteBlock
 //   Write a block of 32-bit data to the FPGA.
@@ -60,8 +61,9 @@ bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes);
 //     addr   16-bit register address
 //     data   pointer to location that contains 32-bit data
 //     nBytes number of bytes to write (rounds up to multiple of 4)
+//     doSwap whether or not to swap bytes (true --> compatible with PC implementation)
 // Returns:  true if success
-bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes);
+bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes, bool doSwap);
 
 // EMIO_WritePromData
 //   Writes the specified bytes to the PROM registers on the FPGA

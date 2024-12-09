@@ -88,12 +88,14 @@ int main()
                 }
                 for (int i = 0; i < num; i++)
                     data[i] = get_hex(argv[3+i]);
-                if (!EMIO_WriteBlock(addr, data, num*sizeof(uint32_t))) {
+                // false --> WriteBlock does not swap bytes
+                if (!EMIO_WriteBlock(addr, data, num*sizeof(uint32_t), false)) {
                     xil_printf("Error writing block\r\n");
                 }
             }
             else {
-                if (EMIO_ReadBlock(addr, data, num*sizeof(uint32_t))) {
+                // false --> ReadBlock does not swap bytes
+                if (EMIO_ReadBlock(addr, data, num*sizeof(uint32_t), false)) {
                     for (int i = 0; i < num; i++)
                         xil_printf("  %08x\r\n", data[i]);
                 }
