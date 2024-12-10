@@ -21,7 +21,7 @@ bool TestBoardID();
 bool TestQSPI();
 bool TestMemory();
 bool TestPROM_SR();
-bool TestPROM_Read();
+bool TestPROM_Read(bool isTest);
 bool TestIO();
 
 void menu()
@@ -91,7 +91,7 @@ void menu()
             TestMemory();
         }
         else if (option == '4') {
-            TestPROM_Read();
+            TestPROM_Read(isTestBoard);
         }
         else if (option == '5') {
             if (isTestBoard)
@@ -166,9 +166,12 @@ const uint16_t prom_data_block = 0x3100;
 
 // Wait for 25AA128 PROM to finish command, which is indicated
 // by the IDLE state (lowest 3 bits 0).
-// For now, just loop up to "num" times. For 25AA128 on QLA,
-// it typically takes 4-6 loops for a 1-byte command to finish.
-// Reading the QLA serial number (12 bytes) takes about 42-43 loops.
+// For now, just loop up to "num" times.
+// For 25AA128 on QLA, it takes 4-6 loops for a 1-byte command.
+// Reading the QLA serial number (12 bytes) takes about 43-44 loops.
+// For the MFG TEST board, it takes 108-115 loops to read 36 bytes
+// (SPI read should be slower for TEST due to additional wait
+// after asserting /CS).
 bool WaitPROM(const char *msg, int num)
 {
     int i;
@@ -244,29 +247,40 @@ bool TestPROM_SR()
 
 // Test PROM Read from address 0
 //   On QLA/DRAC this would be the "QLA xxxx-xx" or "dRA xxxx-xx"
-//   On TEST board, this should be "MFG x.x-01 ..."
+//   On TEST board, this should be "MFG x.x-yy ..."
 
-bool TestPROM_Read()
+bool TestPROM_Read(bool isTest)
 {
-    // Read 12 bytes (3 quadlets) from PROM
-    char data[13];
-    data[12] = 0;  // Make sure null-terminated
-    uint32_t write_data = 0xFE000000|2;
+    // NOTE: can read at most 64 bytes from PROM in a single block read
+    char data[40];
+    // Read 36 characters from TEST board, and 12 characters from other boards
+    unsigned int num_chars = isTest ? 36 : 12;
+    unsigned int num_quads = (num_chars+3)/4;
+    data[num_chars] = 0;  // Make sure null-terminated
+    uint32_t write_data = 0xFE000000|(num_quads-1);
     EMIO_WriteQuadlet(reg_prom_cmd, write_data);
-    if (!WaitPROM("READ", 100)) return false;
+    //
+    if (!WaitPROM("READ", 10+4*num_chars)) return false;
     // true --> ReadBlock swaps bytes
-    bool ret = EMIO_ReadBlock(prom_data_block, (uint32_t *)data, 12, true);
+    bool ret = EMIO_ReadBlock(prom_data_block, (uint32_t *)data, num_chars, true);
     if (ret) {
-        for (int i = 12; i >= 0; i--) {
+        for (int i = num_chars; i >= 0; i--) {
             // Starting at end of string, replace any 0xff (unprogrammed byte)
             // with 0x00, stopping when first non-zero character encountered.
             if (data[i] == 0xff) data[i] = 0x00;
             else if (data[i] != 0) break;
         }
         if (strlen(data) == 0)
-            printf("No characters read\r\n");
+            printf("No characters read");
         else
-            printf("Read \"%s\"\r\n", data);
+            printf("Read \"%s\"", data);
+        if (isTest) {
+            if (strncmp(data, "MFG ", 4) == 0)
+                printf(" -- PASS");
+            else
+                printf(" -- FAIL");
+        }
+        printf("\r\n");
     }
     else
         printf("Failed to read block\r\n");
