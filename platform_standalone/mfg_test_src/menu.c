@@ -13,6 +13,7 @@
 #include "xqspips.h"
 #include "qspi.h"
 #include "fpgav3_emio.h"
+#include "fpgav3_qspi.h"
 
 extern void outbyte(char c);
 extern char inbyte();
@@ -26,6 +27,13 @@ bool TestIO();
 
 void menu()
 {
+    u32 BootModeRegister;
+    BootModeRegister = Xil_In32(BOOT_MODE_REG);
+    BootModeRegister &= BOOT_MODES_MASK;
+    if (BootModeRegister == SD_MODE) {
+        QSPI_Configure();
+    }
+
     // Initialize EMIO bus interface
     EMIO_Init();
 

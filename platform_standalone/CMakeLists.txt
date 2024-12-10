@@ -31,6 +31,15 @@ vitis_platform_create(
 set (FPGAV3LIB_NAME   "fpgav3")
 set (FPGAV3LIB_TARGET "${FPGAV3LIB_NAME}lib")
 
+
+# Note that fpgav3_qspi.h and fpgsv3_qspi.c are in this directory,
+# but are not included in FPGAV3LIB_SOURCE because they rely on
+# qspi.h and qspi.c, which are provided by the "Zynq FSBL" template.
+# Thus, the FSBL applications include them directly.
+set (FPGAV3_QSPI_SOURCE
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_qspi.h"
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_qspi.c")
+
 # Additional source files
 set (FPGAV3LIB_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_emio.h"
@@ -53,7 +62,8 @@ set (FSBL_CONFIG "Release")
 
 # Additional source files
 set (FSBL_SOURCE
-     "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c"
+     ${FPGAV3_QSPI_SOURCE})
 
 vitis_create (APP
     APP_NAME       ${FSBL_NAME}
@@ -76,7 +86,8 @@ set (MFG_TEST_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/menu.c"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/testDefines.h"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/memtest.c"
-     "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c"
+     ${FPGAV3_QSPI_SOURCE})
 
 vitis_create (APP
     APP_NAME       ${MFG_TEST_NAME}
