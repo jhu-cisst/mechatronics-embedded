@@ -344,6 +344,9 @@ bool TestIO()
 
     printf("Testing I/O\r\n");
 
+    uint32_t in[5];             // Inputs for all channels (1-4)
+    uint32_t expected[5];       // Expected values for all channels (1-4)
+
     // ChanDir will hold the IO_DIR settings (1 --> output)
     // ChanMask will mask out any bits not used for loopbacks (-1)
     uint32_t ChanDir[5];
@@ -391,27 +394,50 @@ bool TestIO()
     unsigned int num_errors = 0;
     for (unsigned int val = 0; val <= 1; val++) {
         printf("\r\nWalking bit test (%d) ", val);
+        for (chan = 1; chan <= 4; chan++) {
+            // Set all outputs to 0 or 1 (depending on val)
+            //   if val=1, all outputs (except walking bit) should be 0
+            //   if val=0, all outputs (except walking bit) should be 1
+            EMIO_WriteQuadlet((chan << 4) | OFF_BCFG_IO_OUT, val ? 0 : ChanMask[chan]);
+            //   if val=1, expected inputs (except for walking bit and loopback) should be 0
+            //   if val=0, expected inputs (except for walking bit, loopback and masked bits) should be 1
+            expected[chan] = val ? 0 : ChanMask[chan];
+        }
         for (bank = 1; bank <= 2; bank++) {
             for (i = 0; i < 40; i++) {
                 j = IO_Loop[bank][i];
                 if (i < j) {
-                    chan = IO_Channel(bank, i);
+                    // Get the current channel (1-4) based on the bank (IO1, IO2) and bit number
+                    unsigned int cur_chan = IO_Channel(bank, i);
+                    // Update the output and expected value for the current channel
                     uint32_t out = 1 << (i%32);
-                    uint32_t expected = out | (1 << (j%32));
+                    expected[cur_chan] = out | (1 << (j%32));
                     if (val == 0) {
-                        out = (~out)&ChanMask[chan];
-                        expected = (~expected)&ChanMask[chan];
+                        out = (~out)&ChanMask[cur_chan];
+                        expected[cur_chan] = (~expected[cur_chan])&ChanMask[cur_chan];
                     }
-                    EMIO_WriteQuadlet((chan << 4) | OFF_BCFG_IO_OUT, out);
+                    // Write the output
+                    EMIO_WriteQuadlet((cur_chan << 4) | OFF_BCFG_IO_OUT, out);
                     printf(".");
-                    uint32_t in;
-                    EMIO_ReadQuadlet((chan << 4) | OFF_BCFG_IO_IN, &in);
-                    in &= ChanMask[chan];
-                    if (in != expected) {
-                        printf("\r\nIO%d ERROR: wrote %lx (i=%d), expected %lx (j=%d), read %lx\r\n",
-                               bank, out, i, (expected&ChanMask[chan]), j, (in&ChanMask[chan]));
+                    // Read and compare all channels
+                    bool all_ok = true;
+                    for (chan = 1; chan <= 4; chan++) {
+                        EMIO_ReadQuadlet((chan << 4) | OFF_BCFG_IO_IN, &in[chan]);
+                        in[chan] &= ChanMask[chan];
+                        if (in[chan] != expected[chan])
+                            all_ok = false;
+                    }
+                    if (!all_ok) {
+                        printf("\r\nIO%d ERROR: bit %d, loopback %d, wrote %d\r\n", bank, i, j, val);
+                        printf("   expected: %08lx %08lx %08lx %08lx\r\n",
+                               expected[1], expected[2], expected[3], expected[4]);
+                        printf("   read:     %08lx %08lx %08lx %08lx\r\n",
+                               in[1], in[2], in[3], in[4]);
                         num_errors++;
                     }
+                    // Restore default values
+                    EMIO_WriteQuadlet((cur_chan << 4) | OFF_BCFG_IO_OUT, val ? 0 : ChanMask[cur_chan]);
+                    expected[cur_chan] = val ? 0 : ChanMask[cur_chan];
                 }
             }
         }
