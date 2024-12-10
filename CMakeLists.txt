@@ -197,6 +197,7 @@ if (USE_VITIS)
       include(${VITIS_USE_FILE})
 
       set (VITIS_FSBL_TARGET "zynq_fsbl")
+      set (VITIS_MFG_TARGET  "mfg_test")
 
       add_subdirectory (platform_standalone)
 

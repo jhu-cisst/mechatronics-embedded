@@ -67,7 +67,7 @@ get_property(FSBL_OUTPUT TARGET ${FSBL_NAME} PROPERTY OUTPUT_NAME)
 
 ########################## MFG_TEST App ############################
 
-set (MFG_TEST_NAME   "mfg_test")
+set (MFG_TEST_NAME   ${VITIS_MFG_TARGET})
 set (MFG_TEST_CONFIG "Release")
 
 # Additional source files
