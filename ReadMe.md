@@ -19,7 +19,6 @@ currently does not work on the hardware and this issue would need to be solved.
 The top-level CMake file (CMakeLists.txt) in this directory contains options `TOOLCHAIN_ONLY`,
 `USE_VIVADO`, `USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
 option is only supported on Linux because the Xilinx Petalinux tool is only available on Linux.
-The most common workflows are:
 
 ## Workflows
 
@@ -45,6 +44,9 @@ The toolchain file for Vitis gcc, toolchain_vitis_fpgav3.cmake, can only be gene
 where Xilinx Vitis is available (Linux and Windows). In this case, it is necessary to find the Vitis
 installation in CMake (e.g., by finding the `xsct` executable that is distributed with Vitis).
 
+After configuring and generating in CMake, it is necessary to build (e.g., to call `make` in the build
+tree), which downloads the sysroot used by the toolchain files.
+
 ### 2. Complete build (Linux only)
 
 This is the default setting on Linux. Specifically, `TOOLCHAIN_ONLY` is `OFF` and
@@ -56,13 +58,13 @@ Petalinux root directory and typing `. settings.sh`.
 
 For this workflow, `TOOLCHAIN_ONLY` and `USE_PETALINUX` should be `OFF` and `USE_VIVADO` and `USE_VITIS`
 should be `ON`. This will build `platform_standalone` and `platform_linux`.
-The `platform_standalone` build tree will contain several boot images (`BOOT.bin`) corresponding
-to different standalone applications (e.g., `demo_app`, `mfg_test`, `echo_test`).
+The `platform_standalone` build tree will contain several boot images (BOOT.bin) corresponding
+to different standalone applications (e.g., demo_app, mfg_test, echo_test).
 
-If `USE_PETALINUX_SYSROOT` is `ON`, the `platform_linux` build tree will compile `libfpgav3.so`
-and `fpgav3init.elf` using Vitis and the specified sysroot (`PETALINUX_SYSROOT_EXTERNAL` in CMake).
+If `USE_PETALINUX_SYSROOT` is `ON`, the `platform_linux` build tree will compile libfpgav3.so
+and fpgav3init.elf using Vitis and the specified sysroot (`PETALINUX_SYSROOT_EXTERNAL` in CMake).
 This is not particularly useful, however, since it is better to cross-compile them using the toolchain file,
-as documented in the [Automated Example](cross-compile/ReadMe.md).
+as documented [here](cross_compile/ReadMe.md#automated-example).
 Also, it does not currently work on Windows.
 
 ## Complete Build Process
