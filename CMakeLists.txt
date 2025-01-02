@@ -15,6 +15,11 @@ set (EMBEDDED_VERSION "${EMBEDDED_VERSION_MAJOR}.${EMBEDDED_VERSION_MINOR}.${EMB
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/espm_firmware")
 
+# Git is required by CreateVersions.cmake, which is used to generate fpgav3_version.h and
+# mechatronics-embedded-config.cmake, so we might as well find it here.
+# Note that ExternalProject.cmake and FetchContent.cmake also find Git.
+find_package (Git REQUIRED QUIET)
+
 if (NOT APPLE)
   option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON)
   option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON)
@@ -25,6 +30,7 @@ if (WIN32 OR APPLE)
   set (BUILD_PETALINUX_SYSROOT OFF)
   if (WIN32)
     set (CMAKE_CONFIGURATION_TYPES "Release")   # For Visual Studio
+    set (CMAKE_BUILD_TYPE "Release")            # For Ninja
   endif ()
 else ()
   # Can only build Petalinux on Linux
@@ -90,7 +96,8 @@ set (FPGAV3_VERSION_HEADER   "${CMAKE_CURRENT_BINARY_DIR}/include/fpgav3_version
 configure_file (${VERSION_INPUT_FILE_SRC} ${VERSION_INPUT_FILE_BIN} @ONLY)
 
 add_custom_command (OUTPUT ${VERSION_OUTPUT_FILE_NEW}
-                    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    COMMAND ${CMAKE_COMMAND} -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                                             -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                                              -DTAG_PREFIX="v"
                                              -DIN_FILE=${VERSION_INPUT_FILE_BIN}
                                              -DOUT_FILE=${VERSION_OUTPUT_FILE_NEW}
@@ -98,6 +105,7 @@ add_custom_command (OUTPUT ${VERSION_OUTPUT_FILE_NEW}
                      DEPENDS ${VERSION_INPUT_FILE_BIN})
 
 add_custom_target (FpgaVersionFile ALL
+                   BYPRODUCTS ${FPGAV3_VERSION_HEADER}
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_OUTPUT_FILE_NEW}
                                                                  ${FPGAV3_VERSION_HEADER}
                    COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_OUTPUT_FILE_NEW}
@@ -285,7 +293,9 @@ if (Xilinx_VERSION)
 endif ()
 
 add_custom_target (ConfigFile ALL
-                   COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                   BYPRODUCTS ${CONFIG_FILE}
+                   COMMAND ${CMAKE_COMMAND} -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                                            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                                             -DTAG_PREFIX="v"
                                             -DIN_FILE=${CONFIG_IN_FILE}
                                             -DOUT_FILE=${CONFIG_FILE}
@@ -333,15 +343,24 @@ if (Vitis_FOUND AND (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT))
   string (REPLACE "Arch \"arm64\"" "Arch \"arm32\"" FILE_CONTENTS "${FILE_CONTENTS}")
   # Remove call to find_package(Vitis) since we already define VITIS_ROOT
   string (REPLACE "find_package" "# find_package" FILE_CONTENTS "${FILE_CONTENTS}")
+  if (WIN32)
+    # Add .exe to programs on Windows
+    string (REPLACE "-gcc)" "-gcc.exe)" FILE_CONTENTS "${FILE_CONTENTS}")
+    string (REPLACE "-g++)" "-g++.exe)" FILE_CONTENTS "${FILE_CONTENTS}")
+    # Does not seem necessary to update ld or ar, but we do it anyway
+    string (REPLACE "-ld)" "-ld.exe)" FILE_CONTENTS "${FILE_CONTENTS}")
+    string (REPLACE "-ar)" "-ar.exe)" FILE_CONTENTS "${FILE_CONTENTS}")
+  endif (WIN32)
   file (APPEND ${TOOLCHAIN_VITIS} "${FILE_CONTENTS}")
 
   # Create a binary directory for cross-compiling (cc_vitis)
   set (CC_VITIS_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_vitis")
   file (MAKE_DIRECTORY ${CC_VITIS_BINARY_DIR})
   message (STATUS "Creating cc_vitis (cross-compile binary directory)")
-  # Call CMake, passing in the toolchain file and root path for source files
-  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_VITIS}
-                                           -DPETALINUX_SOURCE_DIR=${CC_PETALINUX_SOURCE_DIR}
+  # Call CMake, passing in the toolchain file, root path for source files and CMake generator
+  execute_process(COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_VITIS}
+                                           -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
+                                           -G "${CMAKE_GENERATOR}"
                                            "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
                   WORKING_DIRECTORY ${CC_VITIS_BINARY_DIR}
                   OUTPUT_QUIET ERROR_QUIET)
@@ -362,9 +381,10 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
   set (CC_CLANG_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_clang")
   file (MAKE_DIRECTORY ${CC_CLANG_BINARY_DIR})
   message (STATUS "Creating cc_clang (cross-compile binary directory)")
-  # Call CMake, passing in the toolchain file and root path for source files
-  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_CLANG}
-                                           -DPETALINUX_SOURCE_DIR=${CC_PETALINUX_SOURCE_DIR}
+  # Call CMake, passing in the toolchain file, root path for source files and CMake generator
+  execute_process(COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_CLANG}
+                                           -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
+                                           -G "${CMAKE_GENERATOR}"
                                            "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
                   WORKING_DIRECTORY ${CC_CLANG_BINARY_DIR}
                   OUTPUT_QUIET ERROR_QUIET)

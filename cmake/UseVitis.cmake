@@ -263,7 +263,7 @@ function (vitis_create OBJECT_TYPE ...)
 
     # If BUILD_CONFIG not specified, default is Release
     if (NOT BUILD_CONFIG)
-      set (BUILD_CONFIG "release")
+      set (BUILD_CONFIG "Release")
     endif (NOT BUILD_CONFIG)
 
     file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)

@@ -113,11 +113,16 @@ Note: Not all of the above packages are really needed.
 
 ## Building on Windows
 
-Building on Windows is not officially supported, although both Vivado and Vitis are available and thus it should be possible to build everything except Petalinux.
+Both Vivado and Vitis are available on Windows and thus it should be possible to build everything except Petalinux.
+However, it seems that on Windows, Vitis does not work reliably with parallel builds.
+We therefore recommend using a command-line build tool, such as Ninja, that supports disabling parallel builds (i.e., `ninja -j1`).
 
-We have not had success, however, running Vitis from Visual Studio, even when disabling parallel builds (e.g., in Visual Studio, Tools...Options...Projects and Solutions...Build and Run...maximum number of parallel project == 1).
+We have not had success running Vitis from Visual Studio, even when disabling parallel builds (e.g., in Visual Studio, Tools...Options...Projects and Solutions...Build and Run...maximum number of parallel project == 1).
+There does not seem to be an option to disable parallel builds in NMake.
 
-In addition, although the cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created, they currently are not functional.
+Currently, Ninja can build everything except `platform_linux`; however, the problem appears to be due to Vitis on Windows (at least for 2023.1).
+
+The cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created and we have successfully cross-compiled `cc_vitis` using Ninja (in this case, `-j1` is not necessary).
 
 ## Building on OS X
 
