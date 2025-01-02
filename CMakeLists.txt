@@ -21,23 +21,30 @@ set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/espm_fi
 # If Git is not found, we cannot enable USE_VITIS or USE_PETALINUX.
 find_package (Git QUIET)
 
-include (CMakeDependentOption)
-cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON
-                        "NOT APPLE" OFF)
-cmake_dependent_option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON
-                        "NOT APPLE" OFF)
-cmake_dependent_option (USE_PETALINUX "Build Petalinux image" OFF
-                        "UNIX" OFF)
-cmake_dependent_option (BUILD_PETALINUX_SYSROOT "Build Petalinux SDK (sysroot)" OFF
-                        "UNIX" OFF)
-
-if (WIN32 OR APPLE)
-  # Turn on USE_PETALINUX_SYSROOT for Windows and Mac because that is likely what will
-  # be needed (e.g., for cross-compiling)
-  option (USE_PETALINUX_SYSROOT "Use Petalinux sysroot for cross-compiling" ON)
+if (UNIX)
+  # On Unix, TOOLCHAIN_ONLY defaults to OFF
+  option (TOOLCHAIN_ONLY "Only create toolchain files and download sysroot" OFF)
 else ()
-  option (USE_PETALINUX_SYSROOT "Use Petalinux sysroot for cross-compiling" OFF)
+  # On other platforms, TOOLCHAIN_ONLY defaults to ON because the most common workflow
+  # is to just support cross-compiling
+  option (TOOLCHAIN_ONLY "Only create toolchain files and download sysroot" ON)
 endif ()
+
+include (CMakeDependentOption)
+# Vivado and Vitis not available on APPLE
+cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON
+                        "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
+cmake_dependent_option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON
+                        "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
+# Petalinux only available on Linux
+cmake_dependent_option (USE_PETALINUX "Build Petalinux image" ON
+                        "UNIX;NOT TOOLCHAIN_ONLY" OFF)
+cmake_dependent_option (BUILD_PETALINUX_SYSROOT "Build Petalinux SDK (sysroot)" ON
+                        "UNIX;USE_PETALINUX" OFF)
+# USE_PETALINUX_SYSROOT is ON when TOOLCHAIN_ONLY is specified, and appears as a user-visible
+# option when not only building the toolchain files and not building the Petalinux sysroot
+cmake_dependent_option (USE_PETALINUX_SYSROOT "Use Petalinux sysroot for cross-compiling" OFF
+                        "NOT TOOLCHAIN_ONLY;NOT BUILD_PETALINUX_SYSROOT" ON)
 
 if (WIN32)
   set (CMAKE_CONFIGURATION_TYPES "Release")   # For Visual Studio
@@ -56,8 +63,7 @@ if (BUILD_PETALINUX_SYSROOT)
 
 elseif (USE_PETALINUX_SYSROOT)
 
-  # If BUILD_PETALINUX_SYSROOT is ON, then PETALINUX_SYSROOT is already set.
-  # Otherwise, we set it to a user-specified sysroot, which defaults to the latest release
+  # We set PETALINUX_SYSROOT to a user-specified sysroot, which defaults to the latest release
   set (PETALINUX_SYSROOT_EXTERNAL
        "https://github.com/jhu-cisst/mechatronics-embedded/releases/latest/download/fpgav3-sysroot-cortexa9.zip"
        CACHE STRING "URL or path to external sysroot (from Petalinux)")
@@ -168,6 +174,7 @@ if (USE_VIVADO)
     include(${VIVADO_USE_FILE})
     set (Xilinx_VERSION ${Vivado_VERSION})
 
+    unset (HW_XSA_FILE CACHE)
     if (BUILD_FPGAV30)
       set (BLOCK_DESIGN_NAME "FpgaV30BlockDesign")
       set (HW_XSA_FILE  "${CMAKE_CURRENT_BINARY_DIR}/block_design/FpgaV30.xsa")
@@ -215,9 +222,12 @@ if (USE_VITIS)
       set (VITIS_FSBL_TARGET "zynq_fsbl")
       set (VITIS_MFG_TARGET  "mfg_test")
 
-      add_subdirectory (platform_standalone)
-
-      add_subdirectory (platform_linux)
+      if (HW_XSA_FILE)
+        add_subdirectory (platform_standalone)
+        add_subdirectory (platform_linux)
+      else ()
+        message (WARNING "Cannot build standalone and linux platforms (Find Vivado or specify HW_XSA_FILE)")
+      endif ()
 
     endif ()
 
