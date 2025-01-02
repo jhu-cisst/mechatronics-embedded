@@ -258,7 +258,11 @@ if (USE_PETALINUX)
       set (Xilinx_VERSION ${Petalinux_VERSION})
       include (${PETALINUX_USE_FILE})
 
-      add_subdirectory (petalinux)
+      if (HW_XSA_FILE)
+        add_subdirectory (petalinux)
+      else ()
+        message (WARNING "Cannot build petalinux (Find Vivado or specify HW_XSA_FILE)")
+      endif ()
 
     endif ()
 

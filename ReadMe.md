@@ -16,20 +16,56 @@ and the previous generations of FPGA1394 boards (V1 and V2), which are based on 
 are therefore not supported by Vivado. In addition, the firmware built by Vivado
 currently does not work on the hardware and this issue would need to be solved.
 
-The top-level CMake file (CMakeLists.txt) in this directory contains options `USE_VIVADO`,
-`USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
+The top-level CMake file (CMakeLists.txt) in this directory contains options `TOOLCHAIN_ONLY`,
+`USE_VIVADO`, `USE_VITIS` and `USE_PETALINUX` to support different workflows. Note that the `USE_PETALINUX`
 option is only supported on Linux because the Xilinx Petalinux tool is only available on Linux.
+The most common workflows are:
 
-The current setup requires the software to be built from a git working tree (i.e., created by
-`git clone`) because it uses the `git` command line program to retrieve version information
+## Workflows
+
+All workflows, except "Generate toolchain file(s)", require the software to be built from a git working tree
+(i.e., created by `git clone`) because they use the `git` command line program to retrieve version information
 (i.e., using `git describe`).
 
-The CMake dependency checking is not perfect, so sometimes it is necessary to either start with
+Also, the CMake dependency checking is not perfect, so sometimes it is necessary to either start with
 a clean build tree, or to manually force certain subprojects to be rebuilt. Many subprojects create a
 `cmake.copy` file in the build tree and deleting this file will cause the subproject to be rebuilt.
 Similarly, deleting `petalinux/images/linux/image.ub` will cause the kernel image to be rebuilt.
 
-## Build Process
+### 1. Generate toolchain file(s) and download sysroot
+
+This is the default setting on non-Linux platforms (Windows and Mac OS X). On Linux systems,
+it is only necessary to set the CMake variable `TOOLCHAIN_ONLY` to `ON`.
+The toolchain file(s) are generated during CMake configuration.
+
+The toolchain file for clang, toolchain_clang_fpgav3.cmake, is generated on all platforms, even if
+clang is not installed. The toolchain file will attempt to find the clang compiler.
+
+The toolchain file for Vitis gcc, toolchain_vitis_fpgav3.cmake, can only be generated on platforms
+where Xilinx Vitis is available (Linux and Windows). In this case, it is necessary to find the Vitis
+installation in CMake (e.g., by finding the `xsct` executable that is distributed with Vitis).
+
+### 2. Complete build (Linux only)
+
+This is the default setting on Linux. Specifically, `TOOLCHAIN_ONLY` is `OFF` and
+`USE_VIVADO`, `USE_VITIS` and `USE_PETALINUX` are all `ON`. Note that before calling CMake,
+it is necessary to set the environment variables for Petalinux, such as by changing to the
+Petalinux root directory and typing `. settings.sh`.
+
+### 3. Partial build (mostly standalone programs, Linux or Windows)
+
+For this workflow, `TOOLCHAIN_ONLY` and `USE_PETALINUX` should be `OFF` and `USE_VIVADO` and `USE_VITIS`
+should be `ON`. This will build `platform_standalone` and `platform_linux`.
+The `platform_standalone` build tree will contain several boot images (`BOOT.bin`) corresponding
+to different standalone applications (e.g., `demo_app`, `mfg_test`, `echo_test`).
+
+If `USE_PETALINUX_SYSROOT` is `ON`, the `platform_linux` build tree will compile `libfpgav3.so`
+and `fpgav3init.elf` using Vitis and the specified sysroot (`PETALINUX_SYSROOT_EXTERNAL` in CMake).
+This is not particularly useful, however, since it is better to cross-compile them using the toolchain file,
+as documented in the [Automated Example](cross-compile/ReadMe.md).
+Also, it does not currently work on Windows.
+
+## Complete Build Process
 
 1. Use Vivado to create the Xilinx Support Archive (XSA) file, which describes the hardware design,
 from the block design. The source files are located in the `block_design` sub-directory.
@@ -99,10 +135,11 @@ created. The `bsp.cfg` file is currently not version-specific (and not used).
 It is necessary to install `libtinfo5`, e.g., `sudo apt install libtinfo5` in addition
 to the usual development tools.
 
-Vitis 2022.2, 2023.1 and 2023.2 already contain CMake V3.3.2, which is used if the Xilinx
-`settings64.sh` file is sourced before calling CMake. Note that it is not necessary to
-source `settings64.sh`, as long as the paths to Vivado and Vitis (xcst) are specified via
-the CMake GUI.
+Vitis 2022.2, 2023.1 and 2023.2 already contain CMake 3.3.2, which is used if the Xilinx
+`settings64.sh` file is sourced before calling CMake. This version of CMake does not meet the
+minimum requirement of 3.16, however, so it is best to avoid sourcing `settings64.sh`.
+Note that it is not necessary to source `settings64.sh`, as long as the paths to Vivado and
+Vitis (xcst) are specified via the CMake GUI.
 
 Petalinux 2022.2, 2023.1 and 2023.2 specify that the following packages should be installed (`apt-get install`):
 iproute2 gawk python3 python build-essential gcc git make net-tools libncurses5-dev tftpd zlib1g-dev libssl-dev flex bison libselinux1 gnupg wget git-core diffstat chrpath socat xterm autoconf libtool tar unzip texinfo zlib1g-dev gcc-multilib automake zlib1g:i386 screen pax gzip cpio python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3
@@ -120,7 +157,7 @@ We therefore recommend using a command-line build tool, such as Ninja, that supp
 We have not had success running Vitis from Visual Studio, even when disabling parallel builds (e.g., in Visual Studio, Tools...Options...Projects and Solutions...Build and Run...maximum number of parallel project == 1).
 There does not seem to be an option to disable parallel builds in NMake.
 
-Currently, Ninja can build everything except `platform_linux`; however, the problem appears to be due to Vitis on Windows (at least for 2023.1).
+Currently, Ninja can build everything except the `platform_linux` library and application; however, the problem appears to be due to Vitis on Windows (at least for 2023.1).
 
 The cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created and we have successfully cross-compiled `cc_vitis` using Ninja (in this case, `-j1` is not necessary).
 
