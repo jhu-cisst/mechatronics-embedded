@@ -63,7 +63,7 @@ bool ProgramFpgaSerialNumber(const char *sn)
     ioctl(fd, MEMUNLOCK, &ei);
     ioctl(fd, MEMERASE, &ei);
 
-    int n = write(fd, "FPGA ", 5);
+    size_t n = write(fd, "FPGA ", 5);
     if (n != 5) {
         printf("ProgramFpgaSerialNumber: error writing FPGA to QSPI flash device\n");
         close(fd);
@@ -118,6 +118,7 @@ bool ProgramFlash(const char *fileName, const char *devName)
     // Get file size
     struct stat src_stat;
     fstat(fdFile, &src_stat);
+    size_t file_size = static_cast<size_t>(src_stat.st_size);
 
     // Now, loop through number of sectors and check whether data in sector needs
     // to be updated.
@@ -125,8 +126,8 @@ bool ProgramFlash(const char *fileName, const char *devName)
     unsigned int numDiff = 0;
     erase_info_t ei;
     ei.length = mtd_info.erasesize;
-    for (size_t nBytes = 0; nBytes < src_stat.st_size; nBytes += mtd_info.erasesize) {
-        size_t bytesLeft = src_stat.st_size - nBytes;
+    for (size_t nBytes = 0; nBytes < file_size; nBytes += mtd_info.erasesize) {
+        size_t bytesLeft = file_size - nBytes;
         size_t nb = (bytesLeft < mtd_info.erasesize) ? bytesLeft : mtd_info.erasesize;
         read(fdFile, fileBuf, nb);
         read(fdFlash, devBuf, nb);

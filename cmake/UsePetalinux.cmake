@@ -465,13 +465,6 @@ function (petalinux_build ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_ROOTFS_OUTPUT}
-        # Copy the rootfs_config file from the source tree.
-        COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                ${ROOTFS_CONFIG_SRC}
-                ${CONFIG_BIN_FILE}
-        # Configure the rootfs. This does not take a long time and has one config menu
-        # (shown if CONFIG_MENU is ON).
         COMMAND petalinux-config -p ${PROJ_NAME} -c rootfs ${CONFIG_OPTION}
         # Save in the archive (this is also the command output)
         COMMAND ${CMAKE_COMMAND}
@@ -481,7 +474,7 @@ function (petalinux_build ...)
         # Update time of PETALINUX_ROOTFS_OUTPUT
         COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_ROOTFS_OUTPUT}
         COMMENT "Copying rootfs_config to build tree and configuring rootfs"
-        DEPENDS ${PROJ_NAME} ${ROOTFS_CONFIG_SRC})
+        DEPENDS ${PROJ_NAME})
 
     # Next, build petalinux.
     # Outputs of petalinux-build
@@ -552,11 +545,6 @@ function (petalinux_build ...)
         COMMAND diff
                 "${CONFIG_BIN_DIR}/config"
                 "${CONFIG_SRC_DIR}/config"
-                || :
-        COMMAND ${CMAKE_COMMAND} -E echo "Checking rootfs_config"
-        COMMAND diff
-                "${CONFIG_BIN_DIR}/rootfs_config"
-                ${ROOTFS_CONFIG_SRC}
                 || :
         COMMENT "Comparing config files in build tree to source tree")
 
