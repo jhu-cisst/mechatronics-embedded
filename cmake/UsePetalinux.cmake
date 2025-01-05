@@ -227,6 +227,12 @@ function (petalinux_create ...)
     # Output of petalinux-config (hardware)
     set (PETALINUX_CONFIG_HW_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/hw-description/system.xsa")
 
+    # Fix cracklib because git branch was renamed from master to main. This is needed for cracklib 2.9.8
+    # (Petalinux 2023.1) and probably other versions. Thus, we use a wildcard to do an in-place edit of any version.
+    # There doesn't seem to be a better way to do this; "petalinux-devtool upgrade cracklib" does not solve problem.
+    set (CRACKLIB_BB
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/components/yocto/layers/poky/meta/recipes-extended/cracklib/cracklib_*.bb")
+
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
         # Copy the config file from the source tree (rootfs_config is copied in petalinux_build)
@@ -238,6 +244,9 @@ function (petalinux_create ...)
         # (shown if CONFIG_MENU is ON). This menu can also be shown by typing petalinux-config -p ${PROJ_NAME}
         # on the command line.
         COMMAND petalinux-config -p ${PROJ_NAME} --get-hw-description ${HW_FILE} ${CONFIG_OPTION}
+        # Fix cracklib by changing from master branch to main branch (presumably this will not be needed in
+        # newer versions of Petalinux). || : is added so that command does not fail if file is missing.
+        COMMAND sed -i s/branch=master/branch=main/g ${CRACKLIB_BB} || :
         # Archive config file
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
