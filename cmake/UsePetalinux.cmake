@@ -13,14 +13,14 @@
 #   - PROJ_NAME          Project name (also used as CMake target name)
 #   - HW_FILE            Input hardware file (XSA)
 #   - CONFIG_MENU        ON --> show config menus (default is OFF)
-#   - CONFIG_SRC         Source config
+#   - CONFIG_SRC         Source config fragment
 #   - BSP_CFG_SRC        Source bsp.cfg
 #   - DEVICE_TREE_FILES  List of device tree files
 #   - RECIPES_CORE_SRC_DIR  Directory for recipes-core (optional)
 #
 # Description:
-#   This function creates the petalinux project. The CONFIG_SRC file (config) is copied to
-#   the project-spec/configs directory in the build tree and the BSP_CFG_SRC (bsp.cfg) file
+#   This function creates the petalinux project. The CONFIG_SRC file is appended  to
+#   the file project-spec/configs/config in the build tree and the BSP_CFG_SRC (bsp.cfg) file
 #   is copied to the project-spec/meta-user/recipes-kernel/linux/linux-xlnx directory in
 #   the build tree.
 #
@@ -74,7 +74,6 @@
 #   - TARGET_NAME        Target name (for CMake)
 #   - PROJ_NAME          Project name
 #   - CONFIG_MENU        ON --> show config menus (default is OFF)
-#   - ROOTFS_CONFIG_SRC  Source rootfs_config
 #   - BIT_FILE           BIT file to use for boot image (optional)
 #   - FSBL_FILE          FSBL file (elf) to use for boot image (optional, default is
 #                        zynq_fsbl.elf in petalinux image directory)
@@ -235,11 +234,6 @@ function (petalinux_create ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_HW_OUTPUT}
-        # Copy the config file from the source tree (rootfs_config is copied in petalinux_build)
-        COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                ${CONFIG_SRC}
-                ${CONFIG_BIN_FILE}
         # Specify the hardware description (XSA) file. This does not take very long and has one config menu
         # (shown if CONFIG_MENU is ON). This menu can also be shown by typing petalinux-config -p ${PROJ_NAME}
         # on the command line.
@@ -256,7 +250,7 @@ function (petalinux_create ...)
         # Adding dependency on ${CONFIG_SRC} forces a complete rebuild if the config file is
         # changed, even though in many cases it would not be necessary (i.e., it is only necessary
         # if one of the hw-description entries is updated).
-        DEPENDS ${PETALINUX_CREATE_OUTPUT} ${HW_FILE} ${CONFIG_SRC})
+        DEPENDS ${PETALINUX_CREATE_OUTPUT} ${HW_FILE})
 
     set (RECIPES_CORE_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/meta-user/recipes-core")
 
@@ -271,6 +265,8 @@ function (petalinux_create ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_OUTPUT}
+        # CMake introduced "cat" command in 3.18, but since we are on Linux, we can just use the system cat
+        COMMAND cat ${CONFIG_SRC} >> ${CONFIG_BIN_FILE}
         # Copy the bsp.cfg file
         COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -295,7 +291,7 @@ function (petalinux_create ...)
                 ${CONFIG_BIN_FILE}
                 ${PETALINUX_CONFIG_OUTPUT}
         COMMENT "Configuring Petalinux kernel"
-        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${BSP_CFG_SRC} ${DEVICE_TREE_FILES})
+        DEPENDS ${PETALINUX_CONFIG_HW_OUTPUT} ${CONFIG_SRC} ${BSP_CFG_SRC} ${DEVICE_TREE_FILES})
 
     add_custom_target (${PROJ_NAME} ALL
                        COMMENT "Checking Petalinux creation and hardware/kernel configuration"
@@ -430,7 +426,6 @@ function (petalinux_build ...)
        TARGET_NAME
        PROJ_NAME
        CONFIG_MENU
-       ROOTFS_CONFIG_SRC
        BIT_FILE
        FSBL_FILE
        DEPENDENCIES)
@@ -452,7 +447,7 @@ function (petalinux_build ...)
     endif (${ARGUMENT_IS_A_KEYWORD} GREATER -1)
   endforeach (arg)
 
-  if (TARGET_NAME AND PROJ_NAME AND ROOTFS_CONFIG_SRC)
+  if (TARGET_NAME AND PROJ_NAME)
 
     if (CONFIG_MENU)
       set (CONFIG_OPTION "")
@@ -539,23 +534,6 @@ function (petalinux_build ...)
     add_custom_target (${TARGET_NAME} ALL
                        COMMENT "Checking Petalinux rootfs configuration and build"
                        DEPENDS ${PETALINUX_BOOT_FILE})
-
-    # Finally, check if config files in build tree differ from source tree
-    # (if there is a difference, consider updating source tree).
-    get_filename_component (CONFIG_SRC_DIR ${ROOTFS_CONFIG_SRC} DIRECTORY)
-    add_custom_command (
-        TARGET ${TARGET_NAME} POST_BUILD
-        # CMake provides a portable compare_files command:
-        #   ${CMAKE_COMMAND} ARGS -E compare_files <file1> <file2>
-        # But, since Petalinux only runs on Linux and since we also want
-        # to see which lines are different, we just use the "diff" command.
-        # The "|| :" is added so that differences are not flagged as errors.
-        COMMAND ${CMAKE_COMMAND} -E echo "Checking config"
-        COMMAND diff
-                "${CONFIG_BIN_DIR}/config"
-                "${CONFIG_SRC_DIR}/config"
-                || :
-        COMMENT "Comparing config files in build tree to source tree")
 
   else ()
 

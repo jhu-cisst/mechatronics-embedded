@@ -3,18 +3,8 @@ set (PETALINUX_PROJ_NAME "fpgav3")
 
 option (PETALINUX_MENU "Show Petalinux config menus" OFF)
 
-# Directory to custom configuration files: config, rootfs_config and bsp.cfg
+# Directory to custom configuration files: fpgav3-fragments.cfg and bsp.cfg
 set (PETALINUX_CONFIG_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/configs")
-if (Petalinux_VERSION STREQUAL "2022.2")
-  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2022.2")
-elseif (Petalinux_VERSION STREQUAL "2023.1")
-  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2023.1")
-else ()
-  if (NOT Petalinux_VERSION STREQUAL "2023.2")
-    message (WARNING "Petalinux ${Petalinux_VERSION} not supported -- using config files from 2023.2")
-  endif ()
-  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2023.2")
-endif ()
 
 # ************************* Petalinux create ******************************
 
@@ -26,7 +16,7 @@ set (PETALINUX_RECIPES_CORE "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
 petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
                   CONFIG_MENU        ${PETALINUX_MENU}
-                  CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
+                  CONFIG_SRC         "${PETALINUX_CONFIG_DIR}/fpgav3-fragments.cfg"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
                   RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
@@ -119,7 +109,6 @@ set (PETALINUX_BUILD_TARGET "${PETALINUX_PROJ_NAME}_build")
 petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  PROJ_NAME           ${PETALINUX_PROJ_NAME}
                  CONFIG_MENU         ${PETALINUX_MENU}
-                 ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
                  ${FSBL_OPTION}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
