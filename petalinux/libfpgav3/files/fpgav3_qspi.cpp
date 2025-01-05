@@ -63,18 +63,19 @@ bool ProgramFpgaSerialNumber(const char *sn)
     ioctl(fd, MEMUNLOCK, &ei);
     ioctl(fd, MEMERASE, &ei);
 
-    size_t n = write(fd, "FPGA ", 5);
+    ssize_t n = write(fd, "FPGA ", 5);
     if (n != 5) {
         printf("ProgramFpgaSerialNumber: error writing FPGA to QSPI flash device\n");
         close(fd);
         return false;
     }
     n = write(fd, sn, sn_len);
-    if (n != sn_len) {
+    bool ret = (n == static_cast<ssize_t>(sn_len));
+    if (!ret) {
         printf("ProgramFpgaSerialNumber: error writing S/N %s to QSPI flash device\n", sn);
     }
     close(fd);
-    return (n == sn_len);
+    return ret;
 }
 
 // Program QSPI flash

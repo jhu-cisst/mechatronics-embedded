@@ -92,7 +92,7 @@ bool ConvertBitstream(const std::string &firmwareName, const std::string &fileDi
 bool FpgaLoad(const std::string &binFile)
 {
     int fd;
-    int nWrite;
+    ssize_t nWrite;
 
     // Write '0' to flags
     fd = open("/sys/class/fpga_manager/fpga0/flags", O_WRONLY);
@@ -116,7 +116,7 @@ bool FpgaLoad(const std::string &binFile)
     }
     nWrite = write(fd, binFile.c_str(), binFile.size()+1);
     close(fd);
-    if (nWrite != binFile.size()+1) {
+    if (nWrite != static_cast<ssize_t>(binFile.size()+1)) {
         std::cout << "FpgaLoad: error writing to FPGA firmware, return code " << nWrite << std::endl;
         return false;
     }
