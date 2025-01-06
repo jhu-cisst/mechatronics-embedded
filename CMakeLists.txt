@@ -413,8 +413,6 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
 
   #### Create clang toolchain file; note that the toolchain file is responsible for finding clang
 
-  set (GCC_VERSION "12.2.0")   # Xilinx 2023.1
-
   set (TOOLCHAIN_CLANG "${CMAKE_CURRENT_BINARY_DIR}/toolchain_clang_fpgav3.cmake")
 
   configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain_clang_fpgav3.cmake.in"
