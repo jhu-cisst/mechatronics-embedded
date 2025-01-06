@@ -7,16 +7,10 @@ else (BUILD_FPGAV30)
   set (PLATFORM_STANDALONE "FpgaV31Standalone")
 endif (BUILD_FPGAV30)
 
-# Vitis 2022.x uses lwip211. Vitis 2023.x uses lwip213.
-if (Vitis_VERSION_MAJOR EQUAL 2022)
-  set (LWIP_LIB "lwip211")
-else ()
-  set (LWIP_LIB "lwip213")
-endif ()
-
 # Libraries to include (xilffs required for fsbl, lwip for echo)
-set (BSP_LIBRARIES "xilffs" "xilrsa" ${LWIP_LIB})
-
+# Note that vitis_platform_create will find the correct library
+# name for "lwip*" (e.g., "lwip211", "lwip213", "lwip220")
+set (BSP_LIBRARIES "xilffs" "xilrsa" "lwip*")
 
 vitis_platform_create(
     PLATFORM_NAME     ${PLATFORM_STANDALONE}

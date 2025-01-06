@@ -64,12 +64,13 @@ function (vivado_block_build ...)
     # to be tested and possibly updated for different versions of Vivado.
     if (NOT (${Vivado_VERSION} STREQUAL "2022.2" OR
              ${Vivado_VERSION} STREQUAL "2023.1" OR
-             ${Vivado_VERSION} STREQUAL "2023.2" ))
+             ${Vivado_VERSION} STREQUAL "2023.2" OR
+             ${Vivado_VERSION} STREQUAL "2024.1" ))
       message (WARNING "Vivado ${Vivado_VERSION} not yet tested")
     endif ()
 
     # For now, just replace version string in file, since the only substantive difference
-    # between the TCL files exported by Vivado 2022.2, 2023.1 and 2023.2 are the version string
+    # between the TCL files exported by Vivado 2022.2, 2023.1, 2023.2 and 2024.1 are the version string
     # (other differences include reordering of some file content).
     # The current REGEX will match any version between "2020" and "2025", with a ".1" or ".2" suffix,
     # but this can be changed as needed. If file differences become more substantive, alternate solutions

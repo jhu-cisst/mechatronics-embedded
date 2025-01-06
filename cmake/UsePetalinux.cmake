@@ -149,6 +149,15 @@
 #                    and (via DEPENDENCIES arg to petalinux_build) on any ${APP_NAME} targets.
 #                    It should be the last target built.
 #
+##########################################################################################
+
+# Petalinux 2024.1 deprecated the -t option to petalinux-create
+if (Petalinux_VERSION VERSION_LESS "2024.1")
+  set (PETALINUX_CREATE_OPTION "-t")
+else ()
+  set (PETALINUX_CREATE_OPTION "")
+endif ()
+
 ################################ petalinux_create ########################################
 
 function (petalinux_create ...)
@@ -211,7 +220,7 @@ function (petalinux_create ...)
     add_custom_command (
         OUTPUT ${PETALINUX_CREATE_OUTPUT}
         # Create the project. This does not take very long.
-        COMMAND petalinux-create -t project --force --template zynq -n ${PROJ_NAME}
+        COMMAND petalinux-create ${PETALINUX_CREATE_OPTION} project --force --template zynq -n ${PROJ_NAME}
         # Archive default versions of config and rootfs_config
         COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
@@ -363,7 +372,8 @@ function (petalinux_app_create ...)
 
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
-          COMMAND petalinux-create -p ${PROJ_NAME} -t apps --template ${APP_TEMPLATE} --name ${APP_NAME} --enable --force
+          COMMAND petalinux-create -p ${PROJ_NAME} ${PETALINUX_CREATE_OPTION} apps --template ${APP_TEMPLATE}
+                  --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -389,7 +399,8 @@ function (petalinux_app_create ...)
 
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
-          COMMAND petalinux-create -p ${PROJ_NAME} -t apps --template ${APP_TEMPLATE} --name ${APP_NAME} --enable --force
+          COMMAND petalinux-create -p ${PROJ_NAME} ${PETALINUX_CREATE_OPTION} apps --template ${APP_TEMPLATE}
+                  --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
