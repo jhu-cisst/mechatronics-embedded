@@ -151,11 +151,14 @@
 #
 ##########################################################################################
 
-# Petalinux 2024.1 deprecated the -t option to petalinux-create
+# Petalinux 2024.1 deprecated the "-t" option to petalinux-create and also uses "boot" and
+# "sysroot" rather than "--boot" and "--sysroot" in petalinux-package.
 if (Petalinux_VERSION VERSION_LESS "2024.1")
   set (PETALINUX_CREATE_OPTION "-t")
+  set (PETALINUX_PACKAGE_PREFIX "--")
 else ()
   set (PETALINUX_CREATE_OPTION "")
+  set (PETALINUX_PACKAGE_PREFIX "")
 endif ()
 
 ################################ petalinux_create ########################################
@@ -372,8 +375,8 @@ function (petalinux_app_create ...)
 
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
-          COMMAND petalinux-create -p ${PROJ_NAME} ${PETALINUX_CREATE_OPTION} apps --template ${APP_TEMPLATE}
-                  --name ${APP_NAME} --enable --force
+          COMMAND petalinux-create ${PETALINUX_CREATE_OPTION} apps -p ${PROJ_NAME} --template ${APP_TEMPLATE}
+	          --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -399,8 +402,8 @@ function (petalinux_app_create ...)
 
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
-          COMMAND petalinux-create -p ${PROJ_NAME} ${PETALINUX_CREATE_OPTION} apps --template ${APP_TEMPLATE}
-                  --name ${APP_NAME} --enable --force
+          COMMAND petalinux-create ${PETALINUX_CREATE_OPTION} apps -p ${PROJ_NAME} --template ${APP_TEMPLATE}
+	          --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -525,7 +528,7 @@ function (petalinux_build ...)
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE} --fpga ${BIT_FILE}
+          COMMAND petalinux-package ${PETALINUX_PACKAGE_PREFIX}boot -p ${PROJ_NAME} --fsbl ${FSBL_FILE} --fpga ${BIT_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
           COMMENT "Petalinux package (boot image), ${MSG_FSBL}"
           DEPENDS ${BIT_FILE} ${PETALINUX_IMAGE_UB} ${FSBL_FILE} ${PETALINUX_UBOOT_FILE})
@@ -534,7 +537,7 @@ function (petalinux_build ...)
 
       add_custom_command (
           OUTPUT ${PETALINUX_BOOT_FILE}
-          COMMAND petalinux-package -p ${PROJ_NAME} --boot --fsbl ${FSBL_FILE}
+          COMMAND petalinux-package ${PETALINUX_PACKAGE_PREFIX}boot -p ${PROJ_NAME} --fsbl ${FSBL_FILE}
                                     --u-boot ${PETALINUX_UBOOT_FILE} --force -o ${PETALINUX_BOOT_FILE}
           COMMENT "Petalinux package (boot image) without BIT file, ${MSG_FSBL}"
                 "${CMAKE_CURRENT_BINARY_DIR}/${PROJ_NAME}/project-spec/configs"
@@ -601,7 +604,7 @@ function (petalinux_build_sdk)
 
     add_custom_command (
         OUTPUT ${PETALINUX_SDK_FILE}
-        COMMAND petalinux-package --sysroot -d ${SDK_INSTALL_DIR}
+        COMMAND petalinux-package ${PETALINUX_PACKAGE_PREFIX}sysroot -d ${SDK_INSTALL_DIR}
         COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_SDK_FILE}
         # For some reason, petalinux-package does not accept the -p parameter,
         # so we use WORKING_DIRECTORY to specify the project subdirectory
