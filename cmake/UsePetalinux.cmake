@@ -17,6 +17,7 @@
 #   - BSP_CFG_SRC        Source bsp.cfg
 #   - DEVICE_TREE_FILES  List of device tree files
 #   - RECIPES_CORE_SRC_DIR  Directory for recipes-core (optional)
+#   - DEPENDENCIES       List of target dependencies
 #
 # Description:
 #   This function creates the petalinux project. The CONFIG_SRC file is appended  to
@@ -173,7 +174,8 @@ function (petalinux_create ...)
        CONFIG_SRC
        BSP_CFG_SRC
        DEVICE_TREE_FILES
-       RECIPES_CORE_SRC_DIR)
+       RECIPES_CORE_SRC_DIR
+       DEPENDENCIES)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -336,7 +338,7 @@ function (petalinux_create ...)
 
     add_custom_target (${PROJ_NAME} ALL
                        COMMENT "Checking Petalinux creation and hardware/kernel configuration"
-                       DEPENDS ${PETALINUX_CONFIG_OUTPUT})
+                       DEPENDS ${PETALINUX_CONFIG_OUTPUT} ${DEPENDENCIES})
 
   else ()
 

@@ -219,6 +219,14 @@ if (USE_VITIS)
       set (Xilinx_VERSION ${Vitis_VERSION})
       include(${VITIS_USE_FILE})
 
+      if (BUILD_FPGAV30)
+        set (PLATFORM_STANDALONE "FpgaV30Standalone")
+        set (PLATFORM_LINUX      "FpgaV30Linux")
+      else ()
+        set (PLATFORM_STANDALONE "FpgaV31Standalone")
+        set (PLATFORM_LINUX      "FpgaV31Linux")
+      endif ()
+
       set (VITIS_FSBL_TARGET "zynq_fsbl")
       set (VITIS_MFG_TARGET  "mfg_test")
 
@@ -351,6 +359,13 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
   # Root directory for Petalinux source files
   set (CC_PETALINUX_SOURCE_DIR "${CMAKE_SOURCE_DIR}/petalinux")
 
+  # Dependency for custom targets
+  if (BUILD_PETALINUX_SYSROOT)
+    set (CC_DEPEND ${PETALINUX_SDK_TARGET})
+  elseif (USE_PETALINUX_SYSROOT)
+    set (CC_DEPEND "sysroot_external")
+  endif ()
+
   #### Create Vitis (gcc) toolchain file, if possible
 
   # If we are not on APPLE, and have not already tried to find Vitis (e.g., by turning on USE_VITIS),
@@ -397,16 +412,26 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
     file (APPEND ${TOOLCHAIN_VITIS} "${FILE_CONTENTS}")
 
     # Create a binary directory for cross-compiling (cc_vitis)
+    message (STATUS "Creating cc_vitis (cross-compile binary directory)")
     set (CC_VITIS_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_vitis")
     file (MAKE_DIRECTORY ${CC_VITIS_BINARY_DIR})
-    message (STATUS "Creating cc_vitis (cross-compile binary directory)")
+
+    set (CC_VITIS_OUTPUT "${CC_VITIS_BINARY_DIR}/CMakeCache.txt")
+
     # Call CMake, passing in the toolchain file, root path for source files and CMake generator
-    execute_process(COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_VITIS}
-                                             -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
-                                             -G "${CMAKE_GENERATOR}"
-                                             "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
-                    WORKING_DIRECTORY ${CC_VITIS_BINARY_DIR}
-                    OUTPUT_QUIET ERROR_QUIET)
+    add_custom_command (OUTPUT ${CC_VITIS_OUTPUT}
+                        COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_VITIS}
+                                                 -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
+                                                 -G "${CMAKE_GENERATOR}"
+                                                 "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
+                        COMMENT "Setting up cc_vitis"
+                        WORKING_DIRECTORY ${CC_VITIS_BINARY_DIR}
+                        DEPENDS ${CC_DEPEND})
+
+    add_custom_target (cc_vitis ALL
+                       COMMENT "Checking cc_vitis"
+                       DEPENDS ${CC_VITIS_OUTPUT})
+
   elseif (NOT APPLE)
     message (STATUS "Not generating toolchain_vitis_fpgav3.cmake (Vitis not found)")
   endif ()
@@ -419,16 +444,43 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
                   ${TOOLCHAIN_CLANG}
                   @ONLY)
 
-  # Create a binary directory for cross-compiling (cc_lang)
-  set (CC_CLANG_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_clang")
-  file (MAKE_DIRECTORY ${CC_CLANG_BINARY_DIR})
-  message (STATUS "Creating cc_clang (cross-compile binary directory)")
-  # Call CMake, passing in the toolchain file, root path for source files and CMake generator
-  execute_process(COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_CLANG}
-                                           -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
-                                           -G "${CMAKE_GENERATOR}"
-                                           "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
-                  WORKING_DIRECTORY ${CC_CLANG_BINARY_DIR}
-                  OUTPUT_QUIET ERROR_QUIET)
+  set (CC_CLANG_VERSION "" CACHE
+       STRING "clang version to use for cross-compile directory (cc_clang)")
+  mark_as_advanced (CC_CLANG_VERSION)
+
+  if (CC_CLANG_VERSION)
+    set (CC_CLANG_SUFFIX "-${CC_CLANG_VERSION}")
+  else ()
+    set (CC_CLANG_SUFFIX "")
+  endif ()
+
+  find_program (CLANG_CC "clang${CC_CLANG_SUFFIX}")
+  mark_as_advanced (CLANG_CC)
+
+  # Create a binary directory for cross-compiling (cc_clang) only if clang found
+  if (CLANG_CC)
+    message (STATUS "Creating cc_clang (cross-compile binary directory)")
+    set (CC_CLANG_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/cc_clang")
+    file (MAKE_DIRECTORY ${CC_CLANG_BINARY_DIR})
+
+    set (CC_CLANG_OUTPUT "${CC_CLANG_BINARY_DIR}/CMakeCache.txt")
+
+    # Call CMake, passing in the toolchain file, root path for source files and CMake generator
+    add_custom_command (OUTPUT ${CC_CLANG_OUTPUT}
+                        COMMAND ${CMAKE_COMMAND} -D CMAKE_TOOLCHAIN_FILE:FILEPATH=${TOOLCHAIN_CLANG}
+                                                 -D PETALINUX_SOURCE_DIR:PATH=${CC_PETALINUX_SOURCE_DIR}
+                                                 -D CLANG_VERSION=${CC_CLANG_VERSION}
+                                                 -G "${CMAKE_GENERATOR}"
+                                                 "${CMAKE_CURRENT_SOURCE_DIR}/cross_compile"
+                        COMMENT "Setting up cc_clang"
+                        WORKING_DIRECTORY ${CC_CLANG_BINARY_DIR}
+                        DEPENDS ${CC_DEPEND})
+
+    add_custom_target (cc_clang ALL
+                       COMMENT "Checking cc_clang"
+                       DEPENDS ${CC_CLANG_OUTPUT})
+  else ()
+    message (STATUS "Not creating cc_clang cross-compile directory (clang${CC_CLANG_SUFFIX} not found)")
+  endif ()
 
 endif ()

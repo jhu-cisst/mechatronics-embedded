@@ -203,7 +203,7 @@ There does not seem to be an option to disable parallel builds in NMake.
 
 Currently, Ninja can build everything except the `platform_linux` library and application; however, the problem appears to be due to Vitis on Windows (at least for 2023.1).
 
-The cross-compile build subdirectories (`cc_vitis` and `cc_clang`) are created and we have successfully cross-compiled `cc_vitis` using Ninja (in this case, `-j1` is not necessary).
+We have successfully cross-compiled `cc_vitis` using Ninja (in this case, `-j1` is not necessary). We have not yet tested clang on Windows (`cc_clang`).
 
 ## Building on OS X
 

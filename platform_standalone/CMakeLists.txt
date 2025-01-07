@@ -1,12 +1,6 @@
 
 ############################ Platform #############################
 
-if (BUILD_FPGAV30)
-  set (PLATFORM_STANDALONE "FpgaV30Standalone")
-else (BUILD_FPGAV30)
-  set (PLATFORM_STANDALONE "FpgaV31Standalone")
-endif (BUILD_FPGAV30)
-
 # Libraries to include (xilffs required for fsbl, lwip for echo)
 # Note that vitis_platform_create will find the correct library
 # name for "lwip*" (e.g., "lwip211", "lwip213", "lwip220")

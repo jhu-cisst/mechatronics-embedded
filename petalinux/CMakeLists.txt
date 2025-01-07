@@ -19,7 +19,10 @@ petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   CONFIG_SRC         "${PETALINUX_CONFIG_DIR}/fpgav3-fragments.cfg"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
-                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
+                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE}
+                  # Dependency on PLATFORM_STANDALONE is only for petalinux_build, but we
+                  # put it here so that the build flow is more logical
+                  DEPENDENCIES       ${BLOCK_DESIGN_NAME} ${PLATFORM_STANDALONE})
 
 # ************************** fpgav3 library *******************************
 

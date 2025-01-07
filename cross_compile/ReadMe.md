@@ -86,8 +86,8 @@ The top-level CMakeLists.txt automatically completes the first two steps in Part
 
 1. It creates the following two sub-directories in the build tree, where `cc_vitis` and `cc_clang` correspond to the `appbuild` directory:
 
-   * `cc_vitis`:  for cross-compiling with Vitis (gcc), assuming USE_VITIS is ON
-   * `cc_clang`:  for cross-compiling with clang
+   * `cc_vitis`:  for cross-compiling with Vitis (gcc), assuming USE_VITIS is ON and has been found
+   * `cc_clang`:  for cross-compiling with clang, assuming clang has been found
 
 2. It invokes `cmake` with the correct parameters
    * Note that it does **not** use `add_subdirectory(cross_compile)`, since the toolchain file has to be specified when calling `cmake`.

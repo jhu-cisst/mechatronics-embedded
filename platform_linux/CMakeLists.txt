@@ -1,12 +1,6 @@
 
 ############################ Platform #############################
 
-if (BUILD_FPGAV30)
-  set (PLATFORM_LINUX      "FpgaV30Linux")
-else (BUILD_FPGAV30)
-  set (PLATFORM_LINUX      "FpgaV31Linux")
-endif (BUILD_FPGAV30)
-
 set (PLATFORM_LINUX_DEPS ${BLOCK_DESIGN_NAME})
 
 if (USE_PETALINUX_SYSROOT)
@@ -14,7 +8,10 @@ if (USE_PETALINUX_SYSROOT)
   if (BUILD_PETALINUX_SYSROOT)
     set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
                              ${PETALINUX_SDK_TARGET})
-  endif()
+  else ()
+    set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
+                             sysroot_external)
+  endif ()
 
   vitis_platform_create(
       PLATFORM_NAME     ${PLATFORM_LINUX}
