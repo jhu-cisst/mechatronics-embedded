@@ -151,7 +151,7 @@ The main issues so far have involved the configuration file `config`, which is i
 in the build tree. The current approach is to rely on the defaults created by the Petalinux tools, and then
 update `config` by appending `fpgav3-fragments.cfg`.
 
-There currently is one complexity, which is that the FLASH configuration entries contained the term BANKLESS in all tested
+There currently is one complication, which is that the FLASH configuration entries contained the term BANKLESS in all tested
 versions of Petalinux prior to 2024.2, but it is no longer present in 2024.2. Rather than hard-coding for a specific Petalinux
 version, the approach is to examine the system-generated `config` to check whether or not it uses BANKLESS, and then to modify
 the contents of `fpgav3-fragments.cfg` (if needed) prior to appending it. This is handled by `PetalinuxConfigUpdate.cmake`.
@@ -167,7 +167,7 @@ It is recommended to compare `config.cfg` to `config.hw` to determine whether th
 `fpgav3-fragments.cfg`) have been incorporated. It may also be useful to compare `config.hw` and/or `config.cfg`
 to the corresponding files from previously tested versions of Petalinux.
 
-in addition, there is a `rootfs_config` file in `project_spec/configs` and also archived versions in the `fpgav3-configs`
+In addition, there is a `rootfs_config` file in `project_spec/configs` and also archived versions in the `fpgav3-configs`
 directory. This is less important because the root file system packages are now specified in `petalinux-image-minimal.bbappend`,
 which is in the `recipes-core/images` directory.
 
