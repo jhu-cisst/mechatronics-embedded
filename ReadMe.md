@@ -54,6 +54,9 @@ This is the default setting on Linux. Specifically, `TOOLCHAIN_ONLY` is `OFF` an
 it is necessary to set the environment variables for Petalinux, such as by changing to the
 Petalinux root directory and typing `. settings.sh`.
 
+It is highly recommended to have a good Internet connection (wired, if possible) when doing the
+initial Petalinux build due to the large number of packages that are downloaded during the build process.
+
 ### 3. Partial build (mostly standalone programs, Linux or Windows)
 
 For this workflow, `TOOLCHAIN_ONLY` and `USE_PETALINUX` should be `OFF` and `USE_VIVADO` and `USE_VITIS`
@@ -118,17 +121,58 @@ only provides the option to format as exFAT or NTFS.
 
 ## Xilinx Tool Version Dependencies
 
-Following are the dependencies on the Xilinx tool versions (2022.2, 2023.x, 2024.x):
+Significant effort has been made to handle most differences between the Xilinx tool versions (2022.2, 2023.x, 2024.x).
+The main items to note are:
 
-* **block_design (Vivado)**: the exported TCL file, `exported-block-v31.tcl`, contains the Vivado version string ("2022.2"). This is the only substantive
-difference between the TCL files exported by 2022.2, 2023.x, and 2024.x so the current solution is to replace the version string while copying the file from
-the source tree to the build tree. A different solution may be necessary if there are more substantive changes in future Vivado versions.
+### **Vivado (block_design)**
 
-* **platform_standalone (Vitis)**: no differences (auto-detects correct light-weight IP library version, e.g., "lwip211", "lwip213", "lwip220")
+The block design was created using Vivado 2022.2 and exported as a TCL file, `exported-block-v31.tcl`.
+This file contains the Vivado version string ("2022.2"), which so far is the only substantive
+difference between the TCL files exported by 2022.2, 2023.x, and 2024.x. Thus, the current solution
+is to replace the version string while copying the file from the source tree to the build tree.
+A different solution may be necessary if there are more substantive changes in future Vivado versions.
 
-* **platform_linux (Vitis)**: no differences.
+Following is the process for evaluating a new version of Vivado (202x.y):
+1. Build target FpgaV31BlockDesign (for now, ignore the message "Vivado 202x.y not yet tested")
+2. Make sure Vivado is in your path (e.g., `. settings64.sh`)
+3. Change to the `block_design` directory in the build tree
+4. Run `vivado FpgaV31BlockDesign.xpr`
+5. Once Vivado starts, choose "Open Block Design"
+6. In the "Reports" menu, choose "Report IP Status"
+7. Check whether any of the IP cores (processing_system7 or gmii_to_rgmii) need to be upgraded; so far, the IP core versions have been the same for all tested versions of Vivado
+8. In the "File" menu, choose "Export..Export Block Design" to write a TCL file
+9. Compare the TCL file exported above to `exported-block-v31.tcl` and check for any substantive differences
 
-* **petalinux (Petalinux)**: no differences
+Once the new version of Vivado is tested, it can be added to `UseVivado.cmake` to eliminate the warning message.
+
+### **Petalinux**
+
+The main issues so far have involved the configuration file `config`, which is in the `project_spec/configs` directory
+in the build tree. The current approach is to rely on the defaults created by the Petalinux tools, and then
+update `config` by appending `fpgav3-fragments.cfg`.
+
+There currently is one complexity, which is that the FLASH configuration entries contained the term BANKLESS in all tested
+versions of Petalinux prior to 2024.2, but it is no longer present in 2024.2. Rather than hard-coding for a specific Petalinux
+version, the approach is to examine the system-generated `config` to check whether or not it uses BANKLESS, and then to modify
+the contents of `fpgav3-fragments.cfg` (if needed) prior to appending it. This is handled by `PetalinuxConfigUpdate.cmake`.
+
+When evaluating a new version of Petalinux, it is recommended to examine the `config` files generated during the build process,
+which are archived in the `fpgav3-configs` directory in the build tree:
+
+* `config.default`: default configuration created by petalinux-create; generally not necessary to look at this
+* `config.hw`: configuration file after loading the hardware (XSA) file
+* `config.cfg`: configuration file after appending `fpgav3-fragments.cfg` and calling `petalinux-config -c kernel`
+
+It is recommended to compare `config.cfg` to `config.hw` to determine whether the expected changes (from
+`fpgav3-fragments.cfg`) have been incorporated. It may also be useful to compare `config.hw` and/or `config.cfg`
+to the corresponding files from previously tested versions of Petalinux.
+
+in addition, there is a `rootfs_config` file in `project_spec/configs` and also archived versions in the `fpgav3-configs`
+directory. This is less important because the root file system packages are now specified in `petalinux-image-minimal.bbappend`,
+which is in the `recipes-core/images` directory.
+
+Note that many of the archived config files in `fpgav3-configs` are also used as build targets, so deleting them
+will cause parts of the system to be rebuilt.
 
 ## Building on Ubuntu 20.04 / 22.04
 

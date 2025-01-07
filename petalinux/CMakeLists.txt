@@ -174,11 +174,14 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   endif (FSBL_MFG)
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}/images/linux")
+  # PETALINUX_BOOT_FILE used as a dependency because it already has a dependency on
+  # boot.scr and image.ub.
+  set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")
 
   add_custom_target (MicroSDImage ALL
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                             "${PETALINUX_IMAGE_DIR}/BOOT.bin"
+                             ${PETALINUX_BOOT_FILE}
                              ${SD_IMAGE_DIR}
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              "${PETALINUX_IMAGE_DIR}/boot.scr"
@@ -203,7 +206,8 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                                -DCONFIG_OPTIONS="@ONLY"
                                -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
                      COMMENT "Creating MicroSD Image"
-                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_IN_FILE})
+                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_IN_FILE}
+                             ${PETALINUX_BOOT_FILE} ${ZYNQ_BOOT_FILE})
 
   set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
                      "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin")
