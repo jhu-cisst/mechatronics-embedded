@@ -277,8 +277,10 @@ function (petalinux_create ...)
 
     add_custom_command (
         OUTPUT ${PETALINUX_CONFIG_OUTPUT}
-        # CMake introduced "cat" command in 3.18, but since we are on Linux, we can just use the system cat
-        COMMAND cat ${CONFIG_SRC} >> ${CONFIG_BIN_FILE}
+        # Update the config file (CONFIG_BIN_FILE) using the provided CONFIG_SRC
+        COMMAND ${CMAKE_COMMAND} -D CONFIG_FILE=${CONFIG_BIN_FILE}
+                                 -D FRAGMENT_FILE=${CONFIG_SRC}
+                                 -P "${CMAKE_MODULE_PATH}/PetalinuxConfigUpdate.cmake"
         # Copy the bsp.cfg file
         COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -376,7 +378,7 @@ function (petalinux_app_create ...)
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
           COMMAND petalinux-create ${PETALINUX_CREATE_OPTION} apps -p ${PROJ_NAME} --template ${APP_TEMPLATE}
-	          --name ${APP_NAME} --enable --force
+                  --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -403,7 +405,7 @@ function (petalinux_app_create ...)
       add_custom_command (
           OUTPUT ${APP_CREATE_OUTPUT}
           COMMAND petalinux-create ${PETALINUX_CREATE_OPTION} apps -p ${PROJ_NAME} --template ${APP_TEMPLATE}
-	          --name ${APP_NAME} --enable --force
+                  --name ${APP_NAME} --enable --force
           # Enabling the app modifies configs/rootfs_config, so archive it
           COMMAND ${CMAKE_COMMAND}
                   ARGS -E copy_if_different
@@ -481,6 +483,9 @@ function (petalinux_build ...)
     # Output of petalinux-configure
     set (PETALINUX_ROOTFS_OUTPUT "${CONFIG_ARCHIVE_DIR}/rootfs_config.cfg")
 
+    # Output from configuring kernel (used as a dependency here)
+    set (PETALINUX_CONFIG_OUTPUT "${CONFIG_ARCHIVE_DIR}/config.cfg")
+
     add_custom_command (
         OUTPUT ${PETALINUX_ROOTFS_OUTPUT}
         COMMAND petalinux-config -p ${PROJ_NAME} -c rootfs ${CONFIG_OPTION}
@@ -492,7 +497,7 @@ function (petalinux_build ...)
         # Update time of PETALINUX_ROOTFS_OUTPUT
         COMMAND ${CMAKE_COMMAND} -E touch ${PETALINUX_ROOTFS_OUTPUT}
         COMMENT "Copying rootfs_config to build tree and configuring rootfs"
-        DEPENDS ${PROJ_NAME})
+        DEPENDS ${PROJ_NAME} ${PETALINUX_CONFIG_OUTPUT})
 
     # Next, build petalinux.
     # Outputs of petalinux-build

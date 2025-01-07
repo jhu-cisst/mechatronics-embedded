@@ -5,7 +5,7 @@ This repository contains the embedded software for the Zynq 7000 SoC used in the
 The build process is implemented using CMake to invoke the Xilinx build tools, including
 Vivado, Vitis and (on Linux only) Petalinux.
 It has been tested with Vivado/Vitis 2022.2 and 2023.1 on Windows 10 (with Visual Studio 2017) and
-with Vivado/Vitis/Petalinux 2022.2, 2023.1 and 2023.2 on Ubuntu 20.04 or 22.04 (see below).
+with Vivado/Vitis/Petalinux 2022.2, 2023.1, 2023.2, 2024.1 and 2024.2 on Ubuntu 20.04 or 22.04 (see below).
 
 The Zynq 7000 SoC contains both a processor (PS) and FGPA (programmable logic, PL).
 The code in this repository targets the PS. The PL firmware, which is written in Verilog,
@@ -118,19 +118,17 @@ only provides the option to format as exFAT or NTFS.
 
 ## Xilinx Tool Version Dependencies
 
-Following are the dependencies on the Xilinx tool versions (2022.2, 2023.1, 2023.2):
+Following are the dependencies on the Xilinx tool versions (2022.2, 2023.x, 2024.x):
 
 * **block_design (Vivado)**: the exported TCL file, `exported-block-v31.tcl`, contains the Vivado version string ("2022.2"). This is the only substantive
-difference between the TCL files exported by 2022.2, 2023.1, 2023.2, and 2024.1 so the current solution is to replace the version string while copying the file from
+difference between the TCL files exported by 2022.2, 2023.x, and 2024.x so the current solution is to replace the version string while copying the file from
 the source tree to the build tree. A different solution may be necessary if there are more substantive changes in future Vivado versions.
 
 * **platform_standalone (Vitis)**: no differences (auto-detects correct light-weight IP library version, e.g., "lwip211", "lwip213", "lwip220")
 
 * **platform_linux (Vitis)**: no differences.
 
-* **petalinux (Petalinux)**: the `config` and `rootfs_config` files are version-specific (though differences are minor) and are located in 2022.2, 2023.1 and 2023.2 subdirectories of
-the `configs` subdirectory. Other Petalinux versions will use the 2023.2 files, with the expectation that a new subdirectory will subsequently be
-created. The `bsp.cfg` file is currently not version-specific (and not used).
+* **petalinux (Petalinux)**: no differences
 
 ## Building on Ubuntu 20.04 / 22.04
 
