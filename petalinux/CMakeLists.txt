@@ -163,17 +163,18 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
   file (APPEND  ${README_SD} "programmer, in which case all other files are not used.\n")
 
-  set (VERSION_IN_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
-  set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
+  set (VERSION_FILE_IN  "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
+  set (VERSION_FILE_NEW "${CMAKE_CURRENT_BINARY_DIR}/version.txt.new")
+  set (VERSION_FILE     "${SD_IMAGE_DIR}/version.txt")
 
-  file (WRITE   ${VERSION_IN_FILE} "mechatronics-embedded     ${EMBEDDED_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "mechatronics-embedded-git @GIT_VERSION@\n")
-  file (APPEND  ${VERSION_IN_FILE} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "xilinx-tools              ${Xilinx_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "fpga-hw                   ${FPGA_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "espm-firmware             ${ESPM_FIRMWARE_VERSION}\n")
+  file (WRITE   ${VERSION_FILE_IN} "mechatronics-embedded     ${EMBEDDED_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "mechatronics-embedded-git @GIT_VERSION@\n")
+  file (APPEND  ${VERSION_FILE_IN} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "xilinx-tools              ${Xilinx_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "fpga-hw                   ${FPGA_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "espm-firmware             ${ESPM_FIRMWARE_VERSION}\n")
   if (FSBL_MFG)
-    file (APPEND  ${VERSION_IN_FILE} "mfg-test                  1\n")
+    file (APPEND  ${VERSION_FILE_IN} "mfg-test                  1\n")
   endif (FSBL_MFG)
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}/images/linux")
@@ -204,16 +205,21 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND}
                                -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                                -DTAG_PREFIX="v"
-                               -DIN_FILE=${VERSION_IN_FILE}
-                               -DOUT_FILE=${VERSION_FILE}
+                               -DIN_FILE=${VERSION_FILE_IN}
+                               -DOUT_FILE=${VERSION_FILE_NEW}
                                -DCONFIG_OPTIONS="@ONLY"
                                -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             ${VERSION_FILE_NEW}
+                             ${VERSION_FILE}
+                     COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_FILE_NEW}
                      COMMENT "Creating MicroSD Image"
-                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_IN_FILE}
+                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_FILE_IN}
                              ${PETALINUX_BOOT_FILE} ${ZYNQ_BOOT_FILE})
 
   set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
-                     "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin")
+                     "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin"
+                     ${VERSION_FILE})
 
   foreach (bit_file ${FPGAV3_HW_BIT_FILES})
     get_filename_component (bit_file_name ${bit_file} NAME)
