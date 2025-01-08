@@ -94,21 +94,22 @@ petalinux_app_create (APP_NAME       "fpgav3block"
 
 # ************************** Petalinux build *******************************
 
-set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
-                          "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND}
-                          "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND}
-                          "fpgav3block" ${FPGAV3BLOCK_SOURCES}   ${FPGAV3BLOCK_BBAPPEND})
+set (PETALINUX_BUILD_DEPS "libfpgav3"
+                          "fpgav3init"
+                          "fpgav3sn"
+                          "fpgav3block")
 
 if (VITIS_FSBL_TARGET)
   option (FSBL_MFG "Use manufacturing test as FSBL" OFF)
   mark_as_advanced (FSBL_MFG)
   if (FSBL_MFG)
+    set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${VITIS_MFG_TARGET})
     get_property(FSBL_FILE TARGET ${VITIS_MFG_TARGET} PROPERTY OUTPUT_NAME)
   else ()
+    set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${VITIS_FSBL_TARGET})
     get_property(FSBL_FILE TARGET ${VITIS_FSBL_TARGET} PROPERTY OUTPUT_NAME)
   endif ()
   set (FSBL_OPTION  "FSBL_FILE" ${FSBL_FILE})
-  set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${FSBL_FILE})
 else ()
   set (FSBL_OPTION "")
 endif ()
