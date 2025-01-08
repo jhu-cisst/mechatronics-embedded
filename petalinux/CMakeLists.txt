@@ -11,7 +11,12 @@ set (PETALINUX_CONFIG_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/configs")
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
 # Custom recipes-core
-set (PETALINUX_RECIPES_CORE "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
+set (PETALINUX_RECIPES_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
+# Source files relative to PETALINUX_RECIPES_CORE_DIR
+set (PETALINUX_RECIPES_CORE_SRC "base-files/base-files_%.bbappend"
+                                "init-ifupdown/init-ifupdown_%.bbappend"
+                                "init-ifupdown/files/myinterfaces"
+                                "images/petalinux-image-minimal.bbappend")
 
 petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
@@ -19,7 +24,8 @@ petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   CONFIG_SRC         "${PETALINUX_CONFIG_DIR}/fpgav3-fragments.cfg"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
-                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE}
+                  RECIPES_CORE_DIR   ${PETALINUX_RECIPES_CORE_DIR}
+                  RECIPES_CORE_SRC   ${PETALINUX_RECIPES_CORE_SRC}
                   # Dependency on PLATFORM_STANDALONE is only for petalinux_build, but we
                   # put it here so that the build flow is more logical
                   DEPENDENCIES       ${BLOCK_DESIGN_NAME} ${PLATFORM_STANDALONE})

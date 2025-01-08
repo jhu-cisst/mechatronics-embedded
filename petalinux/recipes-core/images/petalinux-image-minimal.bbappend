@@ -21,6 +21,7 @@ IMAGE_INSTALL:append = "\
     packagegroup-core-ssh-dropbear \
     tcpdump \
     avahi-daemon \
+    ntp \
     gpio-demo \
     "
 
