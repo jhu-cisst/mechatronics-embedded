@@ -492,6 +492,9 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
 endif ()
 
 ######################### Show graphviz dependencies ###############################
+# See GraphVizOptions.cmake for relevant options.
+# Note that CMake 3.16 does not support the GRAPHVIZ_CUSTOM_TARGETS option, so the
+# resulting graph is empty (since everything is a custom target).
 
 set (DEP_GRAPH "dep-graph")
 
@@ -507,6 +510,8 @@ endif ()
 if (UNIX)
   find_program (IMG_VIEWER eog NO_CACHE)
   set (IMG_CMD ${IMG_VIEWER} ${DEP_GRAPH}.png &)
+elseif (WIN32)
+  set (IMG_CMD start ${DEP_GRAPH}.png)
 endif ()
 
 add_custom_target (${DEP_GRAPH}
