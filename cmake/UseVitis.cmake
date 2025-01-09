@@ -284,7 +284,7 @@ function (vitis_create OBJECT_TYPE ...)
       set (BUILD_CONFIG "Release")
     endif (NOT BUILD_CONFIG)
 
-    file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
+    file (TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
 
     #************** First, create the app or library ****************
 
@@ -376,12 +376,10 @@ function (vitis_create OBJECT_TYPE ...)
     # If app or library creation was successful, copy OBJECT_PRJ to OBJECT_PRJ_COPY
     file (APPEND ${TCL_CREATE} "file copy -force -- ${OBJECT_PRJ} ${OBJECT_PRJ_COPY}\n")
 
-    get_property(PLATFORM_OUTPUT TARGET ${PLATFORM_NAME} PROPERTY OUTPUT_NAME)
-
     add_custom_command (OUTPUT ${OBJECT_PRJ_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
                         COMMENT "Creating ${XSCT_CMD} ${OBJECT_NAME}"
-                        DEPENDS ${PLATFORM_OUTPUT})
+                        DEPENDS ${PLATFORM_NAME})
 
     #************** Next, build the app or library ****************
 
@@ -502,6 +500,8 @@ function (vitis_boot_create ...)
                       COMMENT "Checking ${BIF_NAME}"
                       DEPENDS ${BOOT_FILE})
 
+    set_property(TARGET ${BIF_NAME}
+                        PROPERTY OUTPUT_NAME ${BOOT_FILE})
   else ()
 
     message (SEND_ERROR "vitis_boot_create: required parameter missing")

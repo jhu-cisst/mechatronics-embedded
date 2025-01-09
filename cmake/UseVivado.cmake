@@ -107,6 +107,8 @@ function (vivado_block_build ...)
     add_custom_target(${PROJ_NAME} ALL
                       DEPENDS ${HW_FILE})
 
+    set_property(TARGET ${PROJ_NAME}
+                        PROPERTY OUTPUT_NAME ${HW_FILE})
   else ()
 
     message (SEND_ERROR "vivado_block_build: required parameter missing")

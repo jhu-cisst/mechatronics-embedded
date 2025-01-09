@@ -139,6 +139,9 @@ if (USE_VITIS OR USE_PETALINUX)
                      COMMENT "Checking fpgav3_version.h"
                      DEPENDS ${VERSION_OUTPUT_FILE_NEW})
 
+    set_property(TARGET FpgaVersionFile
+                        PROPERTY OUTPUT_NAME ${FPGAV3_VERSION_HEADER})
+
   # *******************************************************************************************
 
   find_package (mechatronics-firmware QUIET)
@@ -339,6 +342,9 @@ if (Git_FOUND)
                                               -DCONFIG_OPTIONS="@ONLY"
                                               -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
                      COMMENT "Creating mechatronics-embedded-config.cmake")
+
+  set_property(TARGET ConfigFile
+                      PROPERTY OUTPUT_NAME ${CONFIG_FILE})
 else ()
   # If git executable was not found, we can create mechatronics-embedded-config.cmake at
   # configuration time.
@@ -484,3 +490,28 @@ if (BUILD_PETALINUX_SYSROOT OR USE_PETALINUX_SYSROOT)
   endif ()
 
 endif ()
+
+######################### Show graphviz dependencies ###############################
+
+set (DEP_GRAPH "dep-graph")
+
+# Look for graphviz executable; if not found set GRAPHVIZ_DOT to NOP
+find_program (GRAPHVIZ_DOT dot NO_CACHE)
+if (GRAPHVIZ_DOT)
+  set (GRAPHVIZ_COMMENT ", and ${DEP_GRAPH}.png")
+else ()
+  set (GRAPHVIZ_DOT ${CMAKE_COMMAND} -E true)
+endif ()
+
+# Look for a program to view PNG file
+if (UNIX)
+  find_program (IMG_VIEWER eog NO_CACHE)
+  set (IMG_CMD ${IMG_VIEWER} ${DEP_GRAPH}.png &)
+endif ()
+
+add_custom_target (${DEP_GRAPH}
+                   COMMAND ${CMAKE_COMMAND} --graphviz=${DEP_GRAPH}.dot .
+                   COMMAND ${GRAPHVIZ_DOT} -Tpng -o ${DEP_GRAPH}.png ${DEP_GRAPH}.dot
+                   COMMAND ${IMG_CMD}
+		   COMMAND_EXPAND_LISTS
+                   COMMENT "Creating ${DEP_GRAPH}.dot for graphviz${GRAPHVIZ_COMMENT}")

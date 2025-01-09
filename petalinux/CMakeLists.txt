@@ -131,8 +131,6 @@ set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}
 set (README_GEN "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
 file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
 
-set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
-
 # ***************************** Petalinux MicroSD zip file **********************************
 
 if (mechatronics-firmware_FOUND AND Vitis_FOUND)
@@ -222,7 +220,7 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_FILE_NEW}
                      COMMENT "Creating MicroSD Image"
                      DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_FILE_IN}
-                             ${PETALINUX_BOOT_FILE} ${ZYNQ_BOOT_FILE})
+                             ${PETALINUX_BOOT_FILE} ${ZYNQ_BOOT_FILE} "zynq_boot")
 
   set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
                      "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin"
@@ -243,13 +241,17 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMENT "Checking MicroSD Zip"
                      DEPENDS "MicroSDImage" ${PETALINUX_MICROSD_ZIP})
 
+  set_property(TARGET MicroSDzip
+                      PROPERTY OUTPUT_NAME ${PETALINUX_MICROSD_ZIP})
+
   # The Petalinux SDK does not actually depend on the MicroSD zip file,
   # but we set this dependency to control the build order
-  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_SDK_DEPENDENCIES} "MicroSDzip")
+  set (PETALINUX_SDK_DEPENDENCIES "MicroSDzip")
 
 else ()
 
   message (WARNING "Not configured to create MicroSD image")
+  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
 
 endif ()
 

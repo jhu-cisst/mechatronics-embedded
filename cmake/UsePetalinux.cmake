@@ -353,6 +353,8 @@ function (petalinux_create ...)
                        COMMENT "Checking Petalinux creation and hardware/kernel configuration"
                        DEPENDS ${PETALINUX_CONFIG_OUTPUT} ${DEPENDENCIES})
 
+    set_property(TARGET ${PROJ_NAME}
+                        PROPERTY OUTPUT_NAME ${PETALINUX_CONFIG_OUTPUT})
   else ()
 
     message (SEND_ERROR "petalinux_create: required parameter missing")
@@ -589,6 +591,8 @@ function (petalinux_build ...)
                        COMMENT "Checking Petalinux rootfs configuration and build"
                        DEPENDS ${PETALINUX_BOOT_FILE} ${DEPENDENCIES})
 
+    set_property(TARGET ${TARGET_NAME}
+                        PROPERTY OUTPUT_NAME ${PETALINUX_BOOT_FILE})
   else ()
 
     message (SEND_ERROR "petalinux_build: required parameter missing")
