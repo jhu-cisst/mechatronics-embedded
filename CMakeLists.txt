@@ -32,7 +32,8 @@ endif ()
 
 include (CMakeDependentOption)
 # Vivado and Vitis not available on APPLE
-cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON
+# Default for Vivado is now OFF because it is moving to mechatronics-firmware
+cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" OFF
                         "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
 cmake_dependent_option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON
                         "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
@@ -197,11 +198,13 @@ if (USE_VIVADO)
 elseif (USE_VITIS OR USE_PETALINUX)
 
   set (BLOCK_DESIGN_NAME "")
-  if (BUILD_FPGAV30)
-    find_file (HW_XSA_FILE "FpgaV30.xsa" DOC "XSA file produced by Vivado")
-  else (BUILD_FPGAV30)
-    find_file (HW_XSA_FILE "FpgaV31.xsa" DOC "XSA file produced by Vivado")
-  endif (BUILD_FPGAV30)
+  if (NOT HW_XSA_FILE)
+    if (BUILD_FPGAV30)
+      find_file (HW_XSA_FILE "FpgaV30.xsa" DOC "XSA file produced by Vivado")
+    else (BUILD_FPGAV30)
+      find_file (HW_XSA_FILE "FpgaV31.xsa" DOC "XSA file produced by Vivado")
+    endif (BUILD_FPGAV30)
+  endif ()
 
 endif ()
 
