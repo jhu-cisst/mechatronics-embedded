@@ -30,12 +30,20 @@ cd build
 ccmake ../source
 ```
 
-3. Set CMake options during configuration
+3. Set CMake options during configuration, using one of the three approaches below:
 
-   * USE_PETALINUX_SYSROOT should be ON
-     * Note that this will create a CMake option called PETALINUX_SYSROOT_EXTERNAL, which by default will be set to download the latest sysroot; this can be changed to download a different sysroot, or use one that has already been downloaded
-   * USE_VITIS should be ON if you wish to use gcc provided by Vitis; otherwise it can be OFF
-   * All other options can be OFF
+   1. Easiest: Only create toolchain files (default on Windows and Mac OS X)
+       * TOOLCHAIN_ONLY should be ON
+       * USE_VITIS should be ON if you wish to use gcc provided by Vitis; otherwise it can be OFF
+       * All other options should be OFF
+
+   2. Create toolchain files while also building petalinux (Linux only)
+      * BUILD_PETALINUX_SYSROOT should be ON
+        * The toolchain files will use the locally-built Petalinux sysroot
+
+    3. Create toolchain files while also building standalone and linux platforms, but not petalinux (Linux or Windows)
+       * USE_PETALINUX_SYSROOT should be ON
+         * This will create a CMake option called PETALINUX_SYSROOT_EXTERNAL, which by default will be set to download the latest released sysroot; this can be changed to download a different sysroot, or use one that has already been downloaded
 
 4. Generate project in CMake to create the toolchain files:
 
