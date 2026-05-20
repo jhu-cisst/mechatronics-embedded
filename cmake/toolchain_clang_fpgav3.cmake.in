@@ -46,13 +46,41 @@ endif ()
 
 find_program (CLANG_CC "clang${CLANG_SUFFIX}" REQUIRED)
 
-set (CMAKE_C_COMPILER          "clang${CLANG_SUFFIX}")
+# Extract clang version if not provided
+if (NOT CLANG_VERSION)
+  execute_process(
+    COMMAND ${CLANG_CC} --version
+    OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(REGEX MATCH "version ([0-9]+)" _ "${CLANG_VERSION_OUTPUT}")
+  set(CLANG_VERSION "${CMAKE_MATCH_1}")
+endif()
+
+# Derive clang include path from clang installation
+get_filename_component (CLANG_BIN_DIR "${CLANG_CC}" DIRECTORY)
+get_filename_component (CLANG_INSTALL_DIR "${CLANG_BIN_DIR}" DIRECTORY)
+set (CLANG_INCLUDE_DIR "${CLANG_INSTALL_DIR}/lib/clang/${CLANG_VERSION}/include")
+
+# On macOS (Homebrew), clang++ may not have a versioned suffix
+find_program (CLANG_CXX "clang++${CLANG_SUFFIX}" REQUIRED)
+find_program (CLANG_STRIP "llvm-strip${CLANG_SUFFIX}"
+              NAMES llvm-strip REQUIRED)
+
+set (CMAKE_C_COMPILER          "${CLANG_CC}")   # already found above
 set (CMAKE_C_COMPILER_TARGET   ${gnuArch})
-set (CMAKE_CXX_COMPILER        "clang++${CLANG_SUFFIX}")
+set (CMAKE_CXX_COMPILER        "${CLANG_CXX}")
 set (CMAKE_CXX_COMPILER_TARGET ${gnuArch})
-set (CMAKE_ASM_COMPILER        "clang${CLANG_SUFFIX}")
-set (CMAKE_STRIP               "llvm-strip${CLANG_SUFFIX}")
-set (CLANG_LINKER              "lld${CLANG_SUFFIX}")
+set (CMAKE_ASM_COMPILER        "${CLANG_CC}")
+set (CMAKE_STRIP               "${CLANG_STRIP}")
+
+# clang resolves -fuse-ld=NAME by looking up ld.NAME on PATH (for non-Darwin targets).
+# Homebrew installs an unsuffixed ld.lld but no ld.lld-<ver>, so on macOS we pass
+# plain "lld". Linux apt installs versioned ld.lld-<ver> symlinks, so the suffix is kept.
+if (APPLE)
+  set (CLANG_LINKER            "lld")
+else ()
+  set (CLANG_LINKER            "lld${CLANG_SUFFIX}")
+endif ()
 
 ##################################################################
 # Set up cross compilation paths
@@ -95,7 +123,7 @@ set (EXTRA_COMPILER_FLAGS
       -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPathHf} \
       -isystem ${CLANG_INCLUDE_DIR} \
       -isystem ${Sysroot}/usr/include")
-set (EXTRA_CXX_FLAGS "-std=c++14")
+set (EXTRA_CXX_FLAGS "-std=c++14 -Wno-deprecated-declarations")
 
 set (EXTRA_LINKER_FLAGS
      "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib -L${Sysroot}/lib --sysroot=${Sysroot}")
@@ -109,7 +137,14 @@ set (EXTRA_LINKER_FLAGS
 
 set (CMAKE_C_FLAGS   "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
 set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS} ${EXTRA_CXX_FLAGS}" CACHE STRING "" FORCE)
-set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
+# On Linux, -fno-integrated-as routes to the cross binutils' arm-linux-gnueabihf-as.
+# On macOS no such cross `as` exists, so clang would fall back to the host AArch64
+# assembler and reject AArch32 NEON mnemonics. Use clang's integrated assembler there.
+if (APPLE)
+  set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
+else ()
+  set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS} -fno-integrated-as" CACHE STRING "" FORCE)
+endif ()
 
 set (CMAKE_SHARED_LINKER_FLAGS "${EXTRA_LINKER_FLAGS}" CACHE STRING "" FORCE)
 # Add -pie for position-independent executable
