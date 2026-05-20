@@ -87,11 +87,18 @@ include_directories ("${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath}"
 # Following compiler definition required for floating point hardware
 add_definitions(-D__ARM_PCS_VFP)
 
-set (EXTRA_COMPILER_FLAGS "-mfloat-abi=hard --target=${gnuArch} -Wno-error=deprecated-declarations")
+set (EXTRA_COMPILER_FLAGS
+     "-mfloat-abi=hard -mfpu=neon --target=${gnuArch} --sysroot=${Sysroot} \
+      -nostdinc \
+      -isystem ${Sysroot}/usr/include/c++/${gccVer} \
+      -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath} \
+      -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPathHf} \
+      -isystem ${CLANG_INCLUDE_DIR} \
+      -isystem ${Sysroot}/usr/include")
 set (EXTRA_CXX_FLAGS "-std=c++14")
 
 set (EXTRA_LINKER_FLAGS
-     "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer}")
+     "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib -L${Sysroot}/lib --sysroot=${Sysroot}")
 
 ##################################################################
 # Set CMake compiler and linker flags
