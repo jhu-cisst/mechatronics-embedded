@@ -87,7 +87,8 @@ include_directories ("${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath}"
 # Following compiler definition required for floating point hardware
 add_definitions(-D__ARM_PCS_VFP)
 
-set (EXTRA_COMPILER_FLAGS "-mfloat-abi=hard --target=${gnuArch}")
+set (EXTRA_COMPILER_FLAGS "-mfloat-abi=hard --target=${gnuArch} -Wno-error=deprecated-declarations")
+set (EXTRA_CXX_FLAGS "-std=c++14")
 
 set (EXTRA_LINKER_FLAGS
      "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer}")
@@ -100,7 +101,7 @@ set (EXTRA_LINKER_FLAGS
 # because this code seems to be run twice and we end up with duplication.
 
 set (CMAKE_C_FLAGS   "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
-set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
+set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS} ${EXTRA_CXX_FLAGS}" CACHE STRING "" FORCE)
 set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
 
 set (CMAKE_SHARED_LINKER_FLAGS "${EXTRA_LINKER_FLAGS}" CACHE STRING "" FORCE)
