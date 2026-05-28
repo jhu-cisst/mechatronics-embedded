@@ -46,21 +46,6 @@ endif ()
 
 find_program (CLANG_CC "clang${CLANG_SUFFIX}" REQUIRED)
 
-# Extract clang version if not provided
-if (NOT CLANG_VERSION)
-  execute_process(
-    COMMAND ${CLANG_CC} --version
-    OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REGEX MATCH "version ([0-9]+)" _ "${CLANG_VERSION_OUTPUT}")
-  set(CLANG_VERSION "${CMAKE_MATCH_1}")
-endif()
-
-# Derive clang include path from clang installation
-get_filename_component (CLANG_BIN_DIR "${CLANG_CC}" DIRECTORY)
-get_filename_component (CLANG_INSTALL_DIR "${CLANG_BIN_DIR}" DIRECTORY)
-set (CLANG_INCLUDE_DIR "${CLANG_INSTALL_DIR}/lib/clang/${CLANG_VERSION}/include")
-
 # On macOS (Homebrew), clang++ may not have a versioned suffix
 find_program (CLANG_CXX "clang++${CLANG_SUFFIX}" REQUIRED)
 find_program (CLANG_STRIP "llvm-strip${CLANG_SUFFIX}"
@@ -117,13 +102,8 @@ add_definitions(-D__ARM_PCS_VFP)
 
 set (EXTRA_COMPILER_FLAGS
      "-mfloat-abi=hard -mfpu=neon --target=${gnuArch} --sysroot=${Sysroot} \
-      -nostdinc \
-      -isystem ${Sysroot}/usr/include/c++/${gccVer} \
-      -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath} \
-      -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPathHf} \
-      -isystem ${CLANG_INCLUDE_DIR} \
       -isystem ${Sysroot}/usr/include")
-set (EXTRA_CXX_FLAGS "-std=c++14 -Wno-deprecated-declarations")
+
 
 set (EXTRA_LINKER_FLAGS
      "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib -L${Sysroot}/lib --sysroot=${Sysroot}")
