@@ -46,26 +46,13 @@ endif ()
 
 find_program (CLANG_CC "clang${CLANG_SUFFIX}" REQUIRED)
 
-# On macOS (Homebrew), clang++ may not have a versioned suffix
-find_program (CLANG_CXX "clang++${CLANG_SUFFIX}" REQUIRED)
-find_program (CLANG_STRIP "llvm-strip${CLANG_SUFFIX}"
-              NAMES llvm-strip REQUIRED)
-
-set (CMAKE_C_COMPILER          "${CLANG_CC}")   # already found above
+set (CMAKE_C_COMPILER          "clang${CLANG_SUFFIX}")
 set (CMAKE_C_COMPILER_TARGET   ${gnuArch})
-set (CMAKE_CXX_COMPILER        "${CLANG_CXX}")
+set (CMAKE_CXX_COMPILER        "clang++${CLANG_SUFFIX}")
 set (CMAKE_CXX_COMPILER_TARGET ${gnuArch})
-set (CMAKE_ASM_COMPILER        "${CLANG_CC}")
-set (CMAKE_STRIP               "${CLANG_STRIP}")
-
-# clang resolves -fuse-ld=NAME by looking up ld.NAME on PATH (for non-Darwin targets).
-# Homebrew installs an unsuffixed ld.lld but no ld.lld-<ver>, so on macOS we pass
-# plain "lld". Linux apt installs versioned ld.lld-<ver> symlinks, so the suffix is kept.
-if (APPLE)
-  set (CLANG_LINKER            "lld")
-else ()
-  set (CLANG_LINKER            "lld${CLANG_SUFFIX}")
-endif ()
+set (CMAKE_ASM_COMPILER        "clang${CLANG_SUFFIX}")
+set (CMAKE_STRIP               "llvm-strip${CLANG_SUFFIX}")
+set (CLANG_LINKER              "lld${CLANG_SUFFIX}")
 
 ##################################################################
 # Set up cross compilation paths
@@ -107,6 +94,7 @@ set (EXTRA_COMPILER_FLAGS
 
 set (EXTRA_LINKER_FLAGS
      "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib -L${Sysroot}/lib --sysroot=${Sysroot}")
+
 
 ##################################################################
 # Set CMake compiler and linker flags
