@@ -81,15 +81,15 @@ set (CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 
 set (CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
-include_directories ("${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath}"
-                     "${Sysroot}/usr/include/c++/${gccVer}")
 
 # Following compiler definition required for floating point hardware
 add_definitions(-D__ARM_PCS_VFP)
 
 set (EXTRA_COMPILER_FLAGS
-     "-mfloat-abi=hard -mfpu=neon --target=${gnuArch} --sysroot=${Sysroot} \
-      -isystem ${Sysroot}/usr/include")
+    "-mfloat-abi=hard -mfpu=neon --target=${gnuArch} --sysroot=${Sysroot} \
+    -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath} \
+    -isystem ${Sysroot}/usr/include/c++/${gccVer} \
+    -isystem ${Sysroot}/usr/include")
 
 
 set (EXTRA_LINKER_FLAGS
