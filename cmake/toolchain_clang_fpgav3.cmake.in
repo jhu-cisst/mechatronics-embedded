@@ -104,7 +104,7 @@ set (EXTRA_LINKER_FLAGS
 # because this code seems to be run twice and we end up with duplication.
 
 set (CMAKE_C_FLAGS   "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
-set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS} ${EXTRA_CXX_FLAGS}" CACHE STRING "" FORCE)
+set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
 # On Linux, -fno-integrated-as routes to the cross binutils' arm-linux-gnueabihf-as.
 # On macOS no such cross `as` exists, so clang would fall back to the host AArch64
 # assembler and reject AArch32 NEON mnemonics. Use clang's integrated assembler there.
