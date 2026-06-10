@@ -90,16 +90,20 @@ set (CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 
 set (CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
-include_directories ("${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath}"
-                     "${Sysroot}/usr/include/c++/${gccVer}")
 
 # Following compiler definition required for floating point hardware
 add_definitions(-D__ARM_PCS_VFP)
 
-set (EXTRA_COMPILER_FLAGS "-mfloat-abi=hard --target=${gnuArch}")
+set (EXTRA_COMPILER_FLAGS
+    "-mfloat-abi=hard -mfpu=neon --target=${gnuArch} --sysroot=${Sysroot} \
+    -isystem ${Sysroot}/usr/include/c++/${gccVer}/${sysrootPath} \
+    -isystem ${Sysroot}/usr/include/c++/${gccVer} \
+    -isystem ${Sysroot}/usr/include")
+
 
 set (EXTRA_LINKER_FLAGS
-     "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer}")
+     "-Wl,-z,notext -fuse-ld=${CLANG_LINKER} -B${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib/${sysrootPathHf}/${gccVer} -L${Sysroot}/usr/lib -L${Sysroot}/lib --sysroot=${Sysroot}")
+
 
 ##################################################################
 # Set CMake compiler and linker flags
@@ -110,7 +114,14 @@ set (EXTRA_LINKER_FLAGS
 
 set (CMAKE_C_FLAGS   "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
 set (CMAKE_CXX_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
-set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
+# On Linux, -fno-integrated-as routes to the cross binutils' arm-linux-gnueabihf-as.
+# On macOS no such cross `as` exists, so clang would fall back to the host AArch64
+# assembler and reject AArch32 NEON mnemonics. Use clang's integrated assembler there.
+if (APPLE)
+  set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS}" CACHE STRING "" FORCE)
+else ()
+  set (CMAKE_ASM_FLAGS "${EXTRA_COMPILER_FLAGS} -fno-integrated-as" CACHE STRING "" FORCE)
+endif ()
 
 set (CMAKE_SHARED_LINKER_FLAGS "${EXTRA_LINKER_FLAGS}" CACHE STRING "" FORCE)
 # Add -pie for position-independent executable
