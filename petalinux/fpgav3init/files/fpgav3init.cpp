@@ -206,7 +206,7 @@ bool SetMACandIP(const char *ethName, unsigned int board_id)
 
     // Set MAC address
     // The first 3 bytes are the JHU LCSR CID
-    sprintf(buffer, "ip link set dev %s address FA:61:0E:03:00:%02d", ethName, board_id);
+    sprintf(buffer, "ip link set dev %s address FA:61:0E:03:00:%02X", ethName, board_id);
     ret = system(buffer);
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
