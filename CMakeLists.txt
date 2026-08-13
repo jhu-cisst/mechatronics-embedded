@@ -32,8 +32,7 @@ endif ()
 
 include (CMakeDependentOption)
 # Vivado and Vitis not available on APPLE
-# Default for Vivado is now OFF because it is moving to mechatronics-firmware
-cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" OFF
+cmake_dependent_option (USE_VIVADO "Use Vivado to build block_design (XSA file)" ON
                         "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
 cmake_dependent_option (USE_VITIS "Use Vitis to build platforms (standalone and linux)" ON
                         "NOT APPLE;NOT TOOLCHAIN_ONLY" OFF)
