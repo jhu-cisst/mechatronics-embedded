@@ -13,7 +13,6 @@ set (EMBEDDED_VERSION_PATCH 0)
 set (EMBEDDED_VERSION "${EMBEDDED_VERSION_MAJOR}.${EMBEDDED_VERSION_MINOR}.${EMBEDDED_VERSION_PATCH}")
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set (CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/espm_firmware")
 
 # Git is used by CreateVersions.cmake, which is used to generate fpgav3_version.h and
 # mechatronics-embedded-config.cmake, so we find it here.
@@ -97,9 +96,6 @@ if (USE_VIVADO OR USE_VITIS OR USE_PETALINUX)
   else ()
     set (FPGA_VERSION "3.1")
   endif ()
-
-  # espm-firmware should always be found, since it is in this repository
-  find_package (espm-firmware)
 
 endif ()
 

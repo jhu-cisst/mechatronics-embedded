@@ -153,7 +153,6 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "  image.ub:  Linux kernel image\n")
   file (APPEND  ${README_SD} "  *.bit: Firmware for QLA, DQLA or DRAC\n")
   file (APPEND  ${README_SD} "  qspi-boot.bin:  First-stage boot loader (FSBL) for QSPI, standalone\n")
-  file (APPEND  ${README_SD} "  ${ESPM_FIRMWARE_NAME}:  Firmware for ESPM Programmer\n")
   file (APPEND  ${README_SD} "  version.txt:  Specifies file versions used to build this image\n\n")
   file (APPEND  ${README_SD} "The FPGA V3 boot process begins by loading BOOT.bin, which programs the BCFG firmware and loads Linux.\n")
   file (APPEND  ${README_SD} "More precisely, BOOT.bin includes u-boot, which uses boot.scr to load Linux from image.ub.\n")
@@ -163,10 +162,7 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "designated QSPI flash partition to registers in the FPGA firmware. It also programs the first QSPI\n")
   file (APPEND  ${README_SD} "flash partition with qspi-boot.bin, if the file has not already been programmed. The qspi-boot.bin\n")
   file (APPEND  ${README_SD} "provides a first-stage boot loader that programs the BCFG firmware and then loads a simple standalone\n")
-  file (APPEND  ${README_SD} "application; it is only used when no MicroSD card is inserted.\n\n")
-  file (APPEND  ${README_SD} "The ${ESPM_FIRMWARE_NAME} file is used by the ESPM programmer. It is stored on this MicroSD card so that\n")
-  file (APPEND  ${README_SD} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
-  file (APPEND  ${README_SD} "programmer, in which case all other files are not used.\n")
+  file (APPEND  ${README_SD} "application; it is only used when no MicroSD card is inserted.\n")
 
   set (VERSION_FILE_IN  "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
   set (VERSION_FILE_NEW "${CMAKE_CURRENT_BINARY_DIR}/version.txt.new")
@@ -177,7 +173,6 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${VERSION_FILE_IN} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
   file (APPEND  ${VERSION_FILE_IN} "xilinx-tools              ${Xilinx_VERSION}\n")
   file (APPEND  ${VERSION_FILE_IN} "fpga-hw                   ${FPGA_VERSION}\n")
-  file (APPEND  ${VERSION_FILE_IN} "espm-firmware             ${ESPM_FIRMWARE_VERSION}\n")
   if (FSBL_MFG)
     file (APPEND  ${VERSION_FILE_IN} "mfg-test                  1\n")
   endif (FSBL_MFG)
@@ -204,9 +199,6 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              ${ZYNQ_BOOT_FILE}
                              "${SD_IMAGE_DIR}/qspi-boot.bin"
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                             ${ESPM_FIRMWARE_FILE}
-                             ${SD_IMAGE_DIR}
                      COMMAND ${CMAKE_COMMAND}
                                -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                                -DTAG_PREFIX="v"

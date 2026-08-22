@@ -103,7 +103,6 @@ The `fpgav3-micro-sd.zip` file contains the following files, which are also avai
   * `FPGA1394V3-DQLA.bit` -- firmware for DQLA board
   * `FPGA1394V3-DRAC.bit` -- firmware for dRAC board
   * `qspi-boot.bin` -- standalone first stage boot loader to copy to QSPI flash
-  * `espm.xsvf` -- firmware for ESPM in dVRK-Si arm (PSM or ECM)
   * `version.txt` -- text file containing version information
   * `ReadMe.txt` -- text file describing all files
 
