@@ -13,6 +13,7 @@
 #include "xqspips.h"
 #include "qspi.h"
 #include "fpgav3_emio.h"
+#include "fpgav3_qspi.h"
 
 extern void outbyte(char c);
 extern char inbyte();
@@ -20,9 +21,19 @@ extern char inbyte();
 bool TestBoardID();
 bool TestQSPI();
 bool TestMemory();
+bool TestPROM_SR();
+bool TestPROM_Read(bool isTest);
+bool TestIO();
 
 void menu()
 {
+    u32 BootModeRegister;
+    BootModeRegister = Xil_In32(BOOT_MODE_REG);
+    BootModeRegister &= BOOT_MODES_MASK;
+    if (BootModeRegister == SD_MODE) {
+        QSPI_Configure();
+    }
+
     // Initialize EMIO bus interface
     EMIO_Init();
 
@@ -50,6 +61,11 @@ void menu()
         xil_printf("Failed to initialize QSPI\r\n");
     }
 
+    // Check whether connected to TEST board (Manufacturing Test)
+    uint32_t status_reg;
+    EMIO_ReadQuadlet(0, &status_reg);
+    bool isTestBoard = ((status_reg & 0x00f02000) == 0x00002000);
+
     char option = 1;
     printf("\r\n");
     while (option != '0') {
@@ -57,6 +73,11 @@ void menu()
         printf("1) Test board id\r\n");
         printf("2) Test QSPI\r\n");
         printf("3) Test memory\r\n");
+        printf("4) Test SPI PROM Read\r\n");
+        if (isTestBoard)
+            printf("5) Test I/O\r\n");
+        else
+            printf("5) Test SPI PROM StatusReg\r\n");
         printf("Enter selection:\r\n");
 
         option = inbyte();
@@ -76,6 +97,15 @@ void menu()
         }
         else if (option == '3') {
             TestMemory();
+        }
+        else if (option == '4') {
+            TestPROM_Read(isTestBoard);
+        }
+        else if (option == '5') {
+            if (isTestBoard)
+                TestIO();
+            else
+                TestPROM_SR();
         }
     }   
     printf("Exiting\r\n");    
@@ -132,4 +162,303 @@ bool TestQSPI()
     if (ret) printf("QSPI Test PASS\r\n\r\n");
     else printf("QSPI Test FAIL\r\n\r\n");
     return ret;
+}
+
+// Firmware registers addresses for access to 25AA128 PROM.
+// Note that these would need to be updated for DQLA firmware.
+const uint16_t reg_prom_cmd    = 0x3000;
+const uint16_t reg_prom_status = 0x3001;
+const uint16_t reg_prom_result = 0x3002;
+// Address for block read/write
+const uint16_t prom_data_block = 0x3100;
+
+// Wait for 25AA128 PROM to finish command, which is indicated
+// by the IDLE state (lowest 3 bits 0).
+// For now, just loop up to "num" times.
+// For 25AA128 on QLA, it takes 4-6 loops for a 1-byte command.
+// Reading the QLA serial number (12 bytes) takes about 43-44 loops.
+// For the MFG TEST board, it takes 108-115 loops to read 36 bytes
+// (SPI read should be slower for TEST due to additional wait
+// after asserting /CS).
+bool WaitPROM(const char *msg, int num)
+{
+    int i;
+    bool ret;
+
+    uint32_t prom_status = 0x7;
+    EMIO_ReadQuadlet(reg_prom_status, &prom_status);
+    ret = ((prom_status & 0x7) == 0);
+    if (!ret) {
+        for (i = 1; (i < num) && (!ret); i++) {
+            EMIO_ReadQuadlet(reg_prom_status, &prom_status);
+            ret = ((prom_status & 0x7) == 0);
+        }
+        if (!ret)
+            printf("TIMEOUT waiting for %s, status: %lx\r\n", msg, prom_status);
+#if 0
+        else
+            printf("PROM finished %s in %d of %d loops\r\n", msg, i, num);
+#endif
+    }
+    return ret;
+}
+
+// Tests 25AA128, which is normally connected via SPI to IO1[1:4]
+
+// Test PROM Status Register:
+//   Bit 1 (0x02) is the write-enable latch (WEL)
+//   Sending write enable (WREN) command should set this bit
+//   Sending write disable (WRDI) command should clear this bit
+
+bool TestPROM_SR()
+{
+    // Command values
+    uint32_t cmd_rdsr = 0x05000000;   // Read Status Register
+    uint32_t cmd_wren = 0x06000000;   // WREN (write enable)
+    uint32_t cmd_wrdi = 0x04000000;   // WRDI (write disable)
+    uint32_t prom_result;             // For reading PROM result
+    bool is_good;
+    bool ret = true;
+
+    // Make sure PROM in IDLE state
+    if (!WaitPROM("IDLE", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    printf("PROM status register: %lx\r\n", prom_result);
+
+    printf("Sending command to enable PROM write\r\n");
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_wren);
+    if (!WaitPROM("WREN", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    is_good = (prom_result & 0x02);
+    if (!is_good) ret = false;
+    printf("PROM status register: %lx -- %s\r\n", prom_result, is_good ? "PASS" : "FAIL");
+
+    printf("Sending command to disable PROM write\r\n");
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_wrdi);
+    if (!WaitPROM("WRDI", 15)) return false;
+
+    EMIO_WriteQuadlet(reg_prom_cmd, cmd_rdsr);
+    if (!WaitPROM("RDSR", 15)) return false;
+    EMIO_ReadQuadlet(reg_prom_result, &prom_result);
+    is_good = !(prom_result & 0x02);
+    if (!is_good) ret = false;
+    printf("PROM status register: %lx -- %s\r\n\r\n", prom_result, is_good ? "PASS" : "FAIL");
+
+    return ret;
+}
+
+// Test PROM Read from address 0
+//   On QLA/DRAC this would be the "QLA xxxx-xx" or "dRA xxxx-xx"
+//   On TEST board, this should be "MFG x.x-yy ..."
+
+bool TestPROM_Read(bool isTest)
+{
+    // NOTE: can read at most 64 bytes from PROM in a single block read
+    char data[40];
+    // Read 36 characters from TEST board, and 12 characters from other boards
+    unsigned int num_chars = isTest ? 36 : 12;
+    unsigned int num_quads = (num_chars+3)/4;
+    data[num_chars] = 0;  // Make sure null-terminated
+    uint32_t write_data = 0xFE000000|(num_quads-1);
+    EMIO_WriteQuadlet(reg_prom_cmd, write_data);
+    //
+    if (!WaitPROM("READ", 10+4*num_chars)) return false;
+    // true --> ReadBlock swaps bytes
+    bool ret = EMIO_ReadBlock(prom_data_block, (uint32_t *)data, num_chars, true);
+    if (ret) {
+        for (int i = num_chars; i >= 0; i--) {
+            // Starting at end of string, replace any 0xff (unprogrammed byte)
+            // with 0x00, stopping when first non-zero character encountered.
+            if (data[i] == 0xff) data[i] = 0x00;
+            else if (data[i] != 0) break;
+        }
+        if (strlen(data) == 0)
+            printf("No characters read");
+        else
+            printf("Read \"%s\"", data);
+        if (isTest) {
+            if (strncmp(data, "MFG ", 4) == 0)
+                printf(" -- PASS");
+            else
+                printf(" -- FAIL");
+        }
+        printf("\r\n");
+    }
+    else
+        printf("Failed to read block\r\n");
+
+    printf("\r\n");
+    return ret;
+}
+
+// Channels (see BootConfig.v)
+//  Channel 1:  IO1[31:0]
+//  Channel 2:  IO1[33:32]
+//  Channel 3:  IO2[31:0]
+//  Channel 4:  IO2[39:32]
+
+// IO_Channel: returns the I/O channel number (1-4)
+// Parameters:
+//   bank:    1 --> IO1, 2 --> IO2
+//   index:   0-39
+
+int IO_Channel(unsigned int bank, int index)
+{
+    return (index < 32) ? (2*bank-1) : (2*bank);
+}
+
+// Channel register offsets (see BootConfig.v)
+const uint16_t OFF_BCFG_IO_IN  = 0;
+const uint16_t OFF_BCFG_IO_DIR = 1;
+const uint16_t OFF_BCFG_IO_OUT = 2;
+
+// Loopback configuration
+//   IOn_Loop[i] = j means that IOn[i] <--> IOn[j], where n = 1 or 2
+//   IOn_Loop[i] = -1 means that IOn[i] is not used in loopback (IO1[1:4] are used for SPI, IO1[34:39] do not exist)
+
+int IO1_Loop[40] = {
+//                  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+                    5, -1, -1, -1, -1,  0,  7,  6,  9,  8, 11, 10, 23, 14, 13, 16,
+//                  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
+                    15, 18, 17, 20, 19, 22, 21, 12, 25, 24, 27, 26, 29, 28, 31, 30,
+//                  32  33  34  35  36  37  38  39
+                    33, 32, -1, -1, -1, -1, -1, -1 };
+
+int IO2_Loop[40] = {
+//                  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+                    1,  0,  3,  2,  5,  4,  7,  6,  9,  8, 11, 10, 25, 14, 13, 16,
+//                  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
+                    15, 18, 17, 20, 19, 22, 21, 24, 23, 12, 27, 26, 29, 28, 31, 30,
+//                  32  33  34  35  36  37  38  39
+                    36, 38, 35, 34, 32, 39, 33, 37 };
+
+int *IO_Loop[3] = { 0, IO1_Loop, IO2_Loop };
+
+// IO1[1:4] are SPI to EEPROM, STM32 on test board has pull-ups on all except MISO (output), which has pull-down
+// Following are the loopback pairs:
+//   IO1: 0-5, 6-7, 8-9, 10-11, 12-23, 13-14, 15-16, 17-18, 19-20, 21-22, 24-25, 26-27, 28-29, 30-31, 32-33
+//   IO2: 0-1, 2-3, 4-5, 6-7, 8-9, 10-11, 12-25, 13-14, 15-16, 17-18, 19-20, 21-22, 23-24, 26-27, 28-29, 30-31,
+//        32-36, 33-38, 34-35, 37-39
+bool TestIO()
+{
+    int i, j;
+    unsigned int bank, chan;
+
+    printf("Testing I/O\r\n");
+
+    uint32_t in[5];             // Inputs for all channels (1-4)
+    uint32_t expected[5];       // Expected values for all channels (1-4)
+
+    // ChanDir will hold the IO_DIR settings (1 --> output)
+    // ChanMask will mask out any bits not used for loopbacks (-1)
+    uint32_t ChanDir[5];
+    uint32_t ChanMask[5];
+    for (chan = 0; chan <= 4; chan++) {
+        ChanDir[chan] = 0;
+        ChanMask[chan] = 0;
+    }
+
+    // First, check that IO1_Loop and IO2_Loop are consistent (should be, unless a programming error),
+    // and initialize ChanDir so that each lowest numbered index (in loopback pair) is set as output.
+    for (bank = 1; bank <= 2; bank++) {
+        for (i = 0; i < 40; i++) {
+            j = IO_Loop[bank][i];
+            if (j < 0)
+                continue;
+            if (IO_Loop[bank][j] != i) {
+                printf("IO inconsistency, IO%d[%d] = %d\r\n", bank, i, j);
+                return false;
+            }
+            chan = IO_Channel(bank, i);
+            uint32_t bit_mask = 1 << (i%32);
+            ChanMask[chan] |= bit_mask;
+            if (i < j)
+                ChanDir[chan] |= bit_mask;
+        }
+    }
+
+    // Make sure all I/O are input
+    for (chan = 1; chan <= 4; chan++) {
+        uint32_t io_dir;
+        EMIO_ReadQuadlet((chan<<4) | OFF_BCFG_IO_DIR, &io_dir);
+        if (io_dir != 0) {
+            printf("Channel %d: io_dir = %lx, resetting\r\n", chan, io_dir);
+            EMIO_WriteQuadlet((chan<<4) | OFF_BCFG_IO_DIR, 0);
+        }
+    }
+
+    // Set the direction
+    for (chan = 1; chan <= 4; chan++) {
+        EMIO_WriteQuadlet((chan << 4) | OFF_BCFG_IO_DIR, ChanDir[chan]);
+    }
+
+    // Run the walking bit test, first with a single 0, then with a single 1
+    unsigned int num_errors = 0;
+    for (unsigned int val = 0; val <= 1; val++) {
+        printf("\r\nWalking bit test (%d) ", val);
+        for (chan = 1; chan <= 4; chan++) {
+            // Set all outputs to 0 or 1 (depending on val)
+            //   if val=1, all outputs (except walking bit) should be 0
+            //   if val=0, all outputs (except walking bit) should be 1
+            EMIO_WriteQuadlet((chan << 4) | OFF_BCFG_IO_OUT, val ? 0 : ChanMask[chan]);
+            //   if val=1, expected inputs (except for walking bit and loopback) should be 0
+            //   if val=0, expected inputs (except for walking bit, loopback and masked bits) should be 1
+            expected[chan] = val ? 0 : ChanMask[chan];
+        }
+        for (bank = 1; bank <= 2; bank++) {
+            for (i = 0; i < 40; i++) {
+                j = IO_Loop[bank][i];
+                if (i < j) {
+                    // Get the current channel (1-4) based on the bank (IO1, IO2) and bit number
+                    unsigned int cur_chan = IO_Channel(bank, i);
+                    // Update the output and expected value for the current channel
+                    uint32_t out = 1 << (i%32);
+                    expected[cur_chan] = out | (1 << (j%32));
+                    if (val == 0) {
+                        out = (~out)&ChanMask[cur_chan];
+                        expected[cur_chan] = (~expected[cur_chan])&ChanMask[cur_chan];
+                    }
+                    // Write the output
+                    EMIO_WriteQuadlet((cur_chan << 4) | OFF_BCFG_IO_OUT, out);
+                    printf(".");
+                    // Read and compare all channels
+                    bool all_ok = true;
+                    for (chan = 1; chan <= 4; chan++) {
+                        EMIO_ReadQuadlet((chan << 4) | OFF_BCFG_IO_IN, &in[chan]);
+                        in[chan] &= ChanMask[chan];
+                        if (in[chan] != expected[chan])
+                            all_ok = false;
+                    }
+                    if (!all_ok) {
+                        printf("\r\nIO%d ERROR: bit %d, loopback %d, wrote %d\r\n", bank, i, j, val);
+                        printf("   expected: %08lx %08lx %08lx %08lx\r\n",
+                               expected[1], expected[2], expected[3], expected[4]);
+                        printf("   read:     %08lx %08lx %08lx %08lx\r\n",
+                               in[1], in[2], in[3], in[4]);
+                        num_errors++;
+                    }
+                    // Restore default values
+                    EMIO_WriteQuadlet((cur_chan << 4) | OFF_BCFG_IO_OUT, val ? 0 : ChanMask[cur_chan]);
+                    expected[cur_chan] = val ? 0 : ChanMask[cur_chan];
+                }
+            }
+        }
+    }
+
+    // Set all directions to input
+    for (chan = 1; chan <= 4; chan++)
+        EMIO_WriteQuadlet((chan << 4) | OFF_BCFG_IO_DIR, 0);
+
+    if (num_errors > 0)
+        printf("\r\n*** Detected %d errors\r\n\r\n", num_errors);
+    else
+        printf("\r\nLoopback test successful\r\n\r\n");
+
+    return (num_errors == 0);
 }

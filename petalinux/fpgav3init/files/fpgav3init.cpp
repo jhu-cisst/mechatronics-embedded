@@ -31,9 +31,16 @@
 #include <fpgav3_lib.h>
 
 // Detected board type
-enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC };
-std::string BoardName[5] = { "Unknown", "None", "QLA", "DQLA", "DRAC" };
-std::string FirmwareName[5] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC" };
+enum BoardType { BOARD_UNKNOWN, BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST };
+std::string BoardName[6] = { "Unknown", "None", "QLA", "DQLA", "DRAC", "TEST" };
+std::string FirmwareName[6] = { "", "", "FPGA1394V3-QLA", "FPGA1394V3-DQLA", "FPGA1394V3-DRAC", "" };
+
+// Standard dvrk arm assignments for DQLA
+std::string ArmName_DQLA[16] = { "MTML", "", "MTMR", "", "ECM", "", "PSM1", "", "PSM2", "", "PSM3",
+                                 "", "", "", "", "" };
+// Standard dvrk arm assignments for DRAC
+std::string ArmName_DRAC[16] = { "", "", "", "", "ECM", "", "PSM1", "", "PSM2", "", "PSM3",
+                                 "", "", "", "", "" };
 
 // CopyFile from srcDir to destDir.
 // Note that srcDir and destDir should not have a trailing '/' character.
@@ -92,7 +99,7 @@ bool ConvertBitstream(const std::string &firmwareName, const std::string &fileDi
 bool FpgaLoad(const std::string &binFile)
 {
     int fd;
-    int nWrite;
+    ssize_t nWrite;
 
     // Write '0' to flags
     fd = open("/sys/class/fpga_manager/fpga0/flags", O_WRONLY);
@@ -116,7 +123,7 @@ bool FpgaLoad(const std::string &binFile)
     }
     nWrite = write(fd, binFile.c_str(), binFile.size()+1);
     close(fd);
-    if (nWrite != binFile.size()+1) {
+    if (nWrite != static_cast<ssize_t>(binFile.size()+1)) {
         std::cout << "FpgaLoad: error writing to FPGA firmware, return code " << nWrite << std::endl;
         return false;
     }
@@ -199,7 +206,7 @@ bool SetMACandIP(const char *ethName, unsigned int board_id)
 
     // Set MAC address
     // The first 3 bytes are the JHU LCSR CID
-    sprintf(buffer, "ip link set dev %s address FA:61:0E:03:00:%02d", ethName, board_id);
+    sprintf(buffer, "ip link set dev %s address FA:61:0E:03:00:%02X", ethName, board_id);
     ret = system(buffer);
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
@@ -222,6 +229,80 @@ bool SetMACandIP(const char *ethName, unsigned int board_id)
     if (ret != 0)
         std::cout << "Error " << ret << ":" << buffer << std::endl;
 
+    return true;
+}
+
+// Configure the Avahi daemon (zeroconf)
+// If successful, this will allow hosts to make calls such as:
+//    ssh root@mtml.local
+//    ssh root@board1.local
+//    ping board3.local
+//    ping board3-f.local
+
+bool ConfigureAvahi(unsigned int board_id, BoardType board_type)
+{
+    char hostname[16];
+    char buffer[128];
+    bool ret;
+
+    // TODO: check if /etc/avahi directory exists
+
+    // Determine hostname to use, based on board_id and board_type.
+    // We can count on board_id being less than 16, because it is
+    // obtained by reading 4 bits from the FPGA status register.
+    if ((board_type == BOARD_DQLA) && !ArmName_DQLA[board_id].empty()) {
+        // If DQLA and using an expected board id, use ArmName_DQLA
+        strcpy(hostname, ArmName_DQLA[board_id].c_str());
+    }
+    else if ((board_type == BOARD_DRAC) && !ArmName_DRAC[board_id].empty()) {
+        // If DRAC and using an expected board id, use ArmName_DRAC
+        strcpy(hostname, ArmName_DRAC[board_id].c_str());
+    }
+    else {
+        // Otherwise, use "board" + board_id
+        sprintf(hostname, "board%d", board_id);
+    }
+    std::cout << "Setting zeroconf hostname to " << hostname << ".local" << std::endl;
+
+    // Set the host-name in avahi-daemon.conf
+    sprintf(buffer, "sed -i s/#host-name=foo/host-name=%s/g /etc/avahi/avahi-daemon.conf", hostname);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "ConfigureAvahi error " << ret << ":" << buffer << std::endl;
+
+    // Append an entry for the FPGA in /etc/avahi/hosts
+    sprintf(buffer, "echo '169.254.0.%d %s-f.local' >> /etc/avahi/hosts", (100+board_id), hostname);
+    ret = system(buffer);
+    if (ret != 0)
+        std::cout << "ConfigureAvahi error " << ret << ":" << buffer << std::endl;
+
+    // Technically, should restart the avahi service, but so far it seems that this program is run
+    // before the service is started
+
+    return true;
+}
+
+// Configure NTP to be a broadcast client on local network
+// Host PC should contain an entry such as the following in its /etc/ntp.conf:
+//   broadcast 169.254.255.255 minpoll 6 maxpoll 10
+// It is not necessary to specify minpoll/maxpoll (default values are 6/10).
+
+bool ConfigureNTP()
+{
+    bool ret;
+
+    // TODO: check if /etc/ntp.conf directory exists
+    std::cout << "Configuring NTP as broadcast client" << std::endl;
+    ret = system("echo 'disable auth' >> /etc/ntp.conf");
+    if (ret != 0) {
+        std::cout << "Configure NTP error 1: " << ret << std::endl;
+        return false;
+    }
+    ret = system("echo 'broadcastclient' >> /etc/ntp.conf");
+    if (ret != 0) {
+        std::cout << "Configure NTP error 2: " << ret << std::endl;
+        return false;
+    }
     return true;
 }
 
@@ -292,8 +373,10 @@ int main(int argc, char **argv)
     std::cout << "Status reg: " << std::hex << std::setw(8) << std::setfill('0')
               << reg_status << std::dec << std::endl;
     unsigned int board_id = (reg_status&0x0f000000)>>24;
-    // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC
+    // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST
     unsigned int board_mask = (reg_status & 0x00f00000)>>20;
+    // check for TEST board
+    if (reg_status & 0x00002000) board_mask |= 0x10;
     bool isV30 = (reg_status&0x00080000);
 
     if (isV30)
@@ -301,14 +384,16 @@ int main(int argc, char **argv)
 
     enum BoardType board_type;
     switch (board_mask) {
-        case 8: board_type = BOARD_NONE;
-                break;
-        case 4: board_type = BOARD_QLA;
-                break;
-        case 2: board_type = BOARD_DQLA;
-                break;
-        case 1: board_type = BOARD_DRAC;
-                break;
+        case 0x10: board_type = BOARD_TEST;
+                   break;
+        case 0x08: board_type = BOARD_NONE;
+                   break;
+        case 0x04: board_type = BOARD_QLA;
+                   break;
+        case 0x02: board_type = BOARD_DQLA;
+                   break;
+        case 0x01: board_type = BOARD_DRAC;
+                   break;
         default:
                 board_type = BOARD_UNKNOWN;
     }
@@ -341,6 +426,12 @@ int main(int argc, char **argv)
     std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
     if (!SetMACandIP("eth0", board_id))
         std::cout << "Failed to set MAC or IP address for eth0" << std::endl;
+
+    // Configure avahi-daemon (zeroconf)
+    ConfigureAvahi(board_id, board_type);
+
+    // Configure NTP
+    ConfigureNTP();
 
     // Copy first 16 bytes (i.e., FPGA S/N)
     // from QSPI flash to FPGA registers

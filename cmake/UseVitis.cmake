@@ -61,6 +61,10 @@
 #       standalone: "Zynq FSBL", "lwIP Echo Server", "Hello World", "Empty Application(C)"
 #       If LANGUAGE is c++, then it should be "Empty Application (C++)"
 #
+#   LIBRARIES can include items with a single wildcard character, such as "lwip*".
+#       In this case, the repository will be queried to find the full name for this
+#       library (e.g., "lwip211" or "lwip213" or "lwip220")
+#
 #   The optional DEPENDENCIES parameter can specify additional dependencies, beyond
 #   the assumed dependency on TARGET_LIBS.
 #
@@ -149,7 +153,21 @@ function (vitis_platform_create ...)
     endif ()
     # Add specified libraries to BSP
     foreach (lib ${LIBRARIES})
-      file (APPEND ${TCL_FILE} "bsp setlib -name ${lib}\n")
+      string (FIND ${lib} "*" WILD_CARD)
+      if (WILD_CARD EQUAL -1)
+        # No wild card in library name; just add it to bsp
+        file (APPEND ${TCL_FILE} "bsp setlib -name ${lib}\n")
+      else ()
+        # Wild card in library name; add TCL commands to find the full library name
+        # (this is used for lwip, which includes the version, e.g., lwip220)
+        string (SUBSTRING ${lib} 0 ${WILD_CARD} lib_base)
+        file (APPEND ${TCL_FILE} "set all_libs [repo -libs]\n")
+        file (APPEND ${TCL_FILE} "set ch_start [string first ${lib_base} \${all_libs}]\n")
+        file (APPEND ${TCL_FILE} "set ch_end [string first \" \" \${all_libs} \${ch_start}]\n")
+        file (APPEND ${TCL_FILE} "set lib_name [string range \${all_libs} \${ch_start} \${ch_end}-1]\n")
+        file (APPEND ${TCL_FILE} "puts \"vitis_platform_create: found \${lib_name}\"\n")
+        file (APPEND ${TCL_FILE} "bsp setlib -name \${lib_name}\n")
+      endif ()
     endforeach (lib)
     # Regenerate BSP (not sure if this is needed)
     if (LIBRARIES)
@@ -263,10 +281,10 @@ function (vitis_create OBJECT_TYPE ...)
 
     # If BUILD_CONFIG not specified, default is Release
     if (NOT BUILD_CONFIG)
-      set (BUILD_CONFIG "release")
+      set (BUILD_CONFIG "Release")
     endif (NOT BUILD_CONFIG)
 
-    file(TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
+    file (TO_NATIVE_PATH ${VITIS_XSCT} XSCT_NATIVE)
 
     #************** First, create the app or library ****************
 
@@ -358,12 +376,10 @@ function (vitis_create OBJECT_TYPE ...)
     # If app or library creation was successful, copy OBJECT_PRJ to OBJECT_PRJ_COPY
     file (APPEND ${TCL_CREATE} "file copy -force -- ${OBJECT_PRJ} ${OBJECT_PRJ_COPY}\n")
 
-    get_property(PLATFORM_OUTPUT TARGET ${PLATFORM_NAME} PROPERTY OUTPUT_NAME)
-
     add_custom_command (OUTPUT ${OBJECT_PRJ_COPY}
                         COMMAND ${XSCT_NATIVE} ${TCL_CREATE}
                         COMMENT "Creating ${XSCT_CMD} ${OBJECT_NAME}"
-                        DEPENDS ${PLATFORM_OUTPUT})
+                        DEPENDS ${PLATFORM_NAME})
 
     #************** Next, build the app or library ****************
 
@@ -484,6 +500,8 @@ function (vitis_boot_create ...)
                       COMMENT "Checking ${BIF_NAME}"
                       DEPENDS ${BOOT_FILE})
 
+    set_property(TARGET ${BIF_NAME}
+                        PROPERTY OUTPUT_NAME ${BOOT_FILE})
   else ()
 
     message (SEND_ERROR "vitis_boot_create: required parameter missing")

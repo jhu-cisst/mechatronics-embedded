@@ -21,8 +21,17 @@
 # Sysroot
 set (Sysroot @PETALINUX_SYSROOT@)
 
-# gcc version (depends on version of Xilinx tools)
-set (gccVer @GCC_VERSION@ CACHE STRING "gcc version used in sysroot")
+# Determine gcc version by examining sysroot. The gcc version
+# (e.g., 12.2.0) should be the only subdirectory in /usr/include/c++
+set (gccIncDir "${Sysroot}/usr/include/c++")
+file (GLOB gccVer RELATIVE ${gccIncDir} "${gccIncDir}/*")
+list (LENGTH gccVer gccVerLen)
+if (gccVerLen EQUAL 1)
+  message (STATUS "Found gcc ${gccVer} in sysroot")
+else ()
+  message (SEND_ERROR "Could not determine gcc version from ${gccIncDir}")
+endif ()
+
 list (APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES gccVer)
 
 # Set Arch to "arm32" because it is used by mechatronics-software CMake files

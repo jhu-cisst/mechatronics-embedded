@@ -166,7 +166,7 @@ bool EMIO_WriteQuadlet(uint16_t addr, uint32_t data)
     return true;
 }
 
-bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
+bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes, bool doSwap)
 {
     unsigned int ver = EMIO_GetVersion();
     if (ver != 1) {
@@ -206,8 +206,7 @@ bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
 
         // Read data from reg_data
         val = Xil_In32(XPS_GPIO_BASEADDR + Reg_InputLower);
-        // data[q] = Xil_EndianSwap32(val);
-        data[q] = val;
+        data[q] = doSwap ? Xil_EndianSwap32(val) : val;
     }
 
     // Set all lines to 0
@@ -216,7 +215,7 @@ bool EMIO_ReadBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
     return true;
 }
 
-bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
+bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes, bool doSwap)
 {
     unsigned int ver = EMIO_GetVersion();
     if (ver != 1) {
@@ -239,8 +238,7 @@ bool EMIO_WriteBlock(uint16_t addr, uint32_t *data, unsigned int nBytes)
     for (q = 0; q < nQuads; q++) {
 
         // Write data
-        // val = Xil_EndianSwap32(data[q]);
-        val = data[q];
+        val = doSwap ? Xil_EndianSwap32(data[q]) : data[q];
         Xil_Out32(XPS_GPIO_BASEADDR + Reg_OutputLower, val);
 
         if (q == nQuads-1) {

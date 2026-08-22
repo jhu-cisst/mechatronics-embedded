@@ -3,31 +3,32 @@ set (PETALINUX_PROJ_NAME "fpgav3")
 
 option (PETALINUX_MENU "Show Petalinux config menus" OFF)
 
-# Directory to custom configuration files: config, rootfs_config and bsp.cfg
+# Directory to custom configuration files: fpgav3-fragments.cfg and bsp.cfg
 set (PETALINUX_CONFIG_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/configs")
-if (Petalinux_VERSION STREQUAL "2022.2")
-  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2022.2")
-else ()
-  if (NOT Petalinux_VERSION STREQUAL "2023.1")
-    message (WARNING "Petalinux ${Petalinux_VERSION} not supported -- using config files from 2023.1")
-  endif ()
-  set (PETALINUX_CONFIG_VER_DIR "${PETALINUX_CONFIG_DIR}/2023.1")
-endif ()
 
 # ************************* Petalinux create ******************************
 
 # Custom device tree
 set (PETALINUX_DEVICE_TREE "${CMAKE_CURRENT_SOURCE_DIR}/device-tree/system-user.dtsi")
 # Custom recipes-core
-set (PETALINUX_RECIPES_CORE "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
+set (PETALINUX_RECIPES_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/recipes-core")
+# Source files relative to PETALINUX_RECIPES_CORE_DIR
+set (PETALINUX_RECIPES_CORE_SRC "base-files/base-files_%.bbappend"
+                                "init-ifupdown/init-ifupdown_%.bbappend"
+                                "init-ifupdown/files/myinterfaces"
+                                "images/petalinux-image-minimal.bbappend")
 
 petalinux_create (PROJ_NAME          ${PETALINUX_PROJ_NAME}
                   HW_FILE            ${HW_XSA_FILE}
                   CONFIG_MENU        ${PETALINUX_MENU}
-                  CONFIG_SRC         "${PETALINUX_CONFIG_VER_DIR}/config"
+                  CONFIG_SRC         "${PETALINUX_CONFIG_DIR}/fpgav3-fragments.cfg"
                   BSP_CFG_SRC        "${PETALINUX_CONFIG_DIR}/bsp.cfg"
                   DEVICE_TREE_FILES  ${PETALINUX_DEVICE_TREE}
-                  RECIPES_CORE_SRC_DIR ${PETALINUX_RECIPES_CORE})
+                  RECIPES_CORE_DIR   ${PETALINUX_RECIPES_CORE_DIR}
+                  RECIPES_CORE_SRC   ${PETALINUX_RECIPES_CORE_SRC}
+                  # Dependency on PLATFORM_STANDALONE is only for petalinux_build, but we
+                  # put it here so that the build flow is more logical
+                  DEPENDENCIES       ${BLOCK_DESIGN_NAME} ${PLATFORM_STANDALONE})
 
 # ************************** fpgav3 library *******************************
 
@@ -93,15 +94,22 @@ petalinux_app_create (APP_NAME       "fpgav3block"
 
 # ************************** Petalinux build *******************************
 
-set (PETALINUX_BUILD_DEPS "libfpgav3"  ${LIBFPGAV3_SOURCES}  ${LIBFPGAV3_BB}
-                          "fpgav3init" ${FPGAV3INIT_SOURCES} ${FPGAV3INIT_BBAPPEND}
-                          "fpgav3sn"   ${FPGAV3SN_SOURCES}   ${FPGAV3SN_BBAPPEND}
-                          "fpgav3block" ${FPGAV3BLOCK_SOURCES}   ${FPGAV3BLOCK_BBAPPEND})
+set (PETALINUX_BUILD_DEPS "libfpgav3"
+                          "fpgav3init"
+                          "fpgav3sn"
+                          "fpgav3block")
 
 if (VITIS_FSBL_TARGET)
-  get_property(FSBL_FILE TARGET ${VITIS_FSBL_TARGET} PROPERTY OUTPUT_NAME)
+  option (FSBL_MFG "Use manufacturing test as FSBL" OFF)
+  mark_as_advanced (FSBL_MFG)
+  if (FSBL_MFG)
+    set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${VITIS_MFG_TARGET})
+    get_property(FSBL_FILE TARGET ${VITIS_MFG_TARGET} PROPERTY OUTPUT_NAME)
+  else ()
+    set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${VITIS_FSBL_TARGET})
+    get_property(FSBL_FILE TARGET ${VITIS_FSBL_TARGET} PROPERTY OUTPUT_NAME)
+  endif ()
   set (FSBL_OPTION  "FSBL_FILE" ${FSBL_FILE})
-  set (PETALINUX_BUILD_DEPS ${PETALINUX_BUILD_DEPS} ${FSBL_FILE})
 else ()
   set (FSBL_OPTION "")
 endif ()
@@ -111,7 +119,6 @@ set (PETALINUX_BUILD_TARGET "${PETALINUX_PROJ_NAME}_build")
 petalinux_build (TARGET_NAME         ${PETALINUX_BUILD_TARGET}
                  PROJ_NAME           ${PETALINUX_PROJ_NAME}
                  CONFIG_MENU         ${PETALINUX_MENU}
-                 ROOTFS_CONFIG_SRC   "${PETALINUX_CONFIG_VER_DIR}/rootfs_config"
                  BIT_FILE            ${BIT_FILE}
                  ${FSBL_OPTION}
                  DEPENDENCIES        ${PETALINUX_BUILD_DEPS})
@@ -123,8 +130,6 @@ set (PETALINUX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}
 
 set (README_GEN "${PETALINUX_GENERATED_DIR}/ReadMe.txt")
 file (WRITE  ${README_GEN} "Directory created by CMake for generated files\n")
-
-set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
 
 # ***************************** Petalinux MicroSD zip file **********************************
 
@@ -148,7 +153,6 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "  image.ub:  Linux kernel image\n")
   file (APPEND  ${README_SD} "  *.bit: Firmware for QLA, DQLA or DRAC\n")
   file (APPEND  ${README_SD} "  qspi-boot.bin:  First-stage boot loader (FSBL) for QSPI, standalone\n")
-  file (APPEND  ${README_SD} "  ${ESPM_FIRMWARE_NAME}:  Firmware for ESPM Programmer\n")
   file (APPEND  ${README_SD} "  version.txt:  Specifies file versions used to build this image\n\n")
   file (APPEND  ${README_SD} "The FPGA V3 boot process begins by loading BOOT.bin, which programs the BCFG firmware and loads Linux.\n")
   file (APPEND  ${README_SD} "More precisely, BOOT.bin includes u-boot, which uses boot.scr to load Linux from image.ub.\n")
@@ -158,27 +162,30 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
   file (APPEND  ${README_SD} "designated QSPI flash partition to registers in the FPGA firmware. It also programs the first QSPI\n")
   file (APPEND  ${README_SD} "flash partition with qspi-boot.bin, if the file has not already been programmed. The qspi-boot.bin\n")
   file (APPEND  ${README_SD} "provides a first-stage boot loader that programs the BCFG firmware and then loads a simple standalone\n")
-  file (APPEND  ${README_SD} "application; it is only used when no MicroSD card is inserted.\n\n")
-  file (APPEND  ${README_SD} "The ${ESPM_FIRMWARE_NAME} file is used by the ESPM programmer. It is stored on this MicroSD card so that\n")
-  file (APPEND  ${README_SD} "it can be used either with FPGA V3, in which case ${ESPM_FIRMWARE_NAME} is not used, or with the ESPM\n")
-  file (APPEND  ${README_SD} "programmer, in which case all other files are not used.\n")
+  file (APPEND  ${README_SD} "application; it is only used when no MicroSD card is inserted.\n")
 
-  set (VERSION_IN_FILE "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
-  set (VERSION_FILE "${SD_IMAGE_DIR}/version.txt")
+  set (VERSION_FILE_IN  "${CMAKE_CURRENT_BINARY_DIR}/version.txt.in")
+  set (VERSION_FILE_NEW "${CMAKE_CURRENT_BINARY_DIR}/version.txt.new")
+  set (VERSION_FILE     "${SD_IMAGE_DIR}/version.txt")
 
-  file (WRITE   ${VERSION_IN_FILE} "mechatronics-embedded     ${EMBEDDED_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "mechatronics-embedded-git @GIT_VERSION@\n")
-  file (APPEND  ${VERSION_IN_FILE} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "xilinx-tools              ${Xilinx_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "fpga-hw                   ${FPGA_VERSION}\n")
-  file (APPEND  ${VERSION_IN_FILE} "espm-firmware             ${ESPM_FIRMWARE_VERSION}\n")
+  file (WRITE   ${VERSION_FILE_IN} "mechatronics-embedded     ${EMBEDDED_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "mechatronics-embedded-git @GIT_VERSION@\n")
+  file (APPEND  ${VERSION_FILE_IN} "mechatronics-firmware     ${FIRMWARE_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "xilinx-tools              ${Xilinx_VERSION}\n")
+  file (APPEND  ${VERSION_FILE_IN} "fpga-hw                   ${FPGA_VERSION}\n")
+  if (FSBL_MFG)
+    file (APPEND  ${VERSION_FILE_IN} "mfg-test                  1\n")
+  endif (FSBL_MFG)
 
   set (PETALINUX_IMAGE_DIR  "${CMAKE_CURRENT_BINARY_DIR}/${PETALINUX_PROJ_NAME}/images/linux")
+  # PETALINUX_BOOT_FILE used as a dependency because it already has a dependency on
+  # boot.scr and image.ub.
+  set (PETALINUX_BOOT_FILE  "${PETALINUX_IMAGE_DIR}/BOOT.bin")
   set (ZYNQ_BOOT_FILE "${CMAKE_BINARY_DIR}/platform_standalone/zynq_boot/BOOT.bin")
 
   add_custom_target (MicroSDImage ALL
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                             "${PETALINUX_IMAGE_DIR}/BOOT.bin"
+                             ${PETALINUX_BOOT_FILE}
                              ${SD_IMAGE_DIR}
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              "${PETALINUX_IMAGE_DIR}/boot.scr"
@@ -192,21 +199,24 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMAND ${CMAKE_COMMAND} -E copy_if_different
                              ${ZYNQ_BOOT_FILE}
                              "${SD_IMAGE_DIR}/qspi-boot.bin"
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                             ${ESPM_FIRMWARE_FILE}
-                             ${SD_IMAGE_DIR}
                      COMMAND ${CMAKE_COMMAND}
                                -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                                -DTAG_PREFIX="v"
-                               -DIN_FILE=${VERSION_IN_FILE}
-                               -DOUT_FILE=${VERSION_FILE}
+                               -DIN_FILE=${VERSION_FILE_IN}
+                               -DOUT_FILE=${VERSION_FILE_NEW}
                                -DCONFIG_OPTIONS="@ONLY"
                                -P "${CMAKE_MODULE_PATH}/CreateVersions.cmake"
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                             ${VERSION_FILE_NEW}
+                             ${VERSION_FILE}
+                     COMMAND ${CMAKE_COMMAND} -E remove -f ${VERSION_FILE_NEW}
                      COMMENT "Creating MicroSD Image"
-                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_IN_FILE})
+                     DEPENDS ${PETALINUX_BUILD_TARGET} ${VERSION_FILE_IN}
+                             ${PETALINUX_BOOT_FILE} ${ZYNQ_BOOT_FILE} "zynq_boot")
 
   set (MICROSD_FILES "${SD_IMAGE_DIR}/BOOT.bin" "${SD_IMAGE_DIR}/boot.scr"
-                     "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin")
+                     "${SD_IMAGE_DIR}/image.ub" "${SD_IMAGE_DIR}/qspi-boot.bin"
+                     ${VERSION_FILE})
 
   foreach (bit_file ${FPGAV3_HW_BIT_FILES})
     get_filename_component (bit_file_name ${bit_file} NAME)
@@ -223,13 +233,17 @@ if (mechatronics-firmware_FOUND AND Vitis_FOUND)
                      COMMENT "Checking MicroSD Zip"
                      DEPENDS "MicroSDImage" ${PETALINUX_MICROSD_ZIP})
 
+  set_property(TARGET MicroSDzip
+                      PROPERTY OUTPUT_NAME ${PETALINUX_MICROSD_ZIP})
+
   # The Petalinux SDK does not actually depend on the MicroSD zip file,
   # but we set this dependency to control the build order
-  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_SDK_DEPENDENCIES} "MicroSDzip")
+  set (PETALINUX_SDK_DEPENDENCIES "MicroSDzip")
 
 else ()
 
   message (WARNING "Not configured to create MicroSD image")
+  set (PETALINUX_SDK_DEPENDENCIES ${PETALINUX_BUILD_TARGET})
 
 endif ()
 

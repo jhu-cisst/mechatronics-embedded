@@ -166,7 +166,8 @@ void EMIO_Interface_Mmap::RegisterWrite(uint32_t reg_addr, uint32_t reg_data)
 }
 
 // Local method to wait for op_done to be set (if state is true) or cleared (if state is false),
-// using polling
+// using polling.
+// Returns true if op_done has reached desired state.
 bool EMIO_Interface_Mmap::WaitOpDone(const char *opType, unsigned int num, bool state)
 {
     // op_done should be set quickly by firmware, to indicate that read or write
@@ -193,7 +194,7 @@ bool EMIO_Interface_Mmap::WaitOpDone(const char *opType, unsigned int num, bool 
             std::cout << opType << " quadlet " << num << (state ? " set" : " clear") << std::endl;
         }
     }
-    return true;
+    return opdone;
 }
 
 // ReadQuadlet: read quadlet from specified address
@@ -206,6 +207,10 @@ bool EMIO_Interface_Mmap::ReadQuadlet(uint16_t addr, uint32_t &data)
     // Get start time for measurement
     if (doTiming > 0)
         GetCurTime(&startTime);
+
+    // Wait for op_done to be clear
+    if (!WaitOpDone("read", 0, false))
+        return false;
 
     // Set all data lines to input
     if (!isInput) {
@@ -225,7 +230,7 @@ bool EMIO_Interface_Mmap::ReadQuadlet(uint16_t addr, uint32_t &data)
 
     // Wait for op_done to be set
     if (!WaitOpDone("read", 0)) {
-        RegisterWrite(Reg_OutputUpper, outreg & (~Bits_RequestBus));
+        RegisterWrite(Reg_OutputUpper, 0);
         return false;
     }
 
@@ -236,10 +241,11 @@ bool EMIO_Interface_Mmap::ReadQuadlet(uint16_t addr, uint32_t &data)
     // Read data
     data = RegisterRead(Reg_InputLower);
     // Set req_bus to 0 (also sets reg_addr to 0)
-    RegisterWrite(Reg_OutputUpper, 0x00000000);
+    RegisterWrite(Reg_OutputUpper, 0);
 
-    // Wait for op_done to be cleared
-    WaitOpDone("read", 0, false);
+    // No longer waiting for op_done to be cleared, because this
+    // check has been moved to beginning (as a precondition)
+    // WaitOpDone("read", 0, false);
 
     // Get end time
     if (doTiming > 0) {
@@ -269,6 +275,10 @@ bool EMIO_Interface_Mmap::WriteQuadlet(uint16_t addr, uint32_t data)
     if (doTiming > 0)
         GetCurTime(&startTime);
 
+    // Wait for op_done to be clear
+    if (!WaitOpDone("write", 0, false))
+        return false;
+
     if (isInput) {
         // Set all data lines to output
         RegisterWrite(Reg_DirLower, 0xffffffff);
@@ -291,20 +301,24 @@ bool EMIO_Interface_Mmap::WriteQuadlet(uint16_t addr, uint32_t data)
         GetCurTime(&beforeWait);
 
     // Wait for op_done to be set
-    bool ret = WaitOpDone("write", 0);
+    if (!WaitOpDone("write", 0)) {
+        RegisterWrite(Reg_OutputUpper, 0);
+        return false;
+    }
 
     // Get time after wait
-    if (ret && (doTiming > 1))
+    if (doTiming > 1)
         GetCurTime(&afterWait);
 
     // Set req_bus to 0 (also sets reg_addr and reg_wen to 0)
-    RegisterWrite(Reg_OutputUpper, 0x00000000);
+    RegisterWrite(Reg_OutputUpper, 0);
 
-    // Wait for op_done to be cleared
-    WaitOpDone("write", 0, false);
+    // No longer waiting for op_done to be cleared, because this
+    // check has been moved to beginning (as a precondition)
+    // WaitOpDone("write", 0, false);
 
     // Get end time
-    if (ret && (doTiming > 0)) {
+    if (doTiming > 0) {
         GetCurTime(&endTime);
         double dt = TimeDiff_us(&startTime, &endTime)-timingOverhead;
         if (doTiming > 1) dt -= 2*timingOverhead;
@@ -335,6 +349,10 @@ bool EMIO_Interface_Mmap::ReadBlock(uint16_t addr, uint32_t *data, unsigned int 
     // Get start time for measurement
     if (doTiming > 0)
         GetCurTime(&startTime);
+
+    // Wait for op_done to be clear
+    if (!WaitOpDone("read", 0, false))
+        return false;
 
     // Set all data lines to input
     if (!isInput) {
@@ -385,8 +403,9 @@ bool EMIO_Interface_Mmap::ReadBlock(uint16_t addr, uint32_t *data, unsigned int 
     // Set all lines to 0
     RegisterWrite(Reg_OutputUpper, 0);
 
-    // Wait for op_done to be cleared
-    WaitOpDone("read", q, false);
+    // No longer waiting for op_done to be cleared, because this
+    // check has been moved to beginning (as a precondition)
+    // WaitOpDone("read", q, false);
 
     // Get end time
     if (doTiming > 0) {
@@ -424,6 +443,10 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
     // Get start time for measurement
     if (doTiming > 0)
         GetCurTime(&startTime);
+
+    // Wait for op_done to be clear
+    if (!WaitOpDone("write", 0, false))
+        return false;
 
     if (isInput) {
         // Set all data lines to output
@@ -470,8 +493,9 @@ bool EMIO_Interface_Mmap::WriteBlock(uint16_t addr, const uint32_t *data, unsign
     if (doTiming > 1)
         GetCurTime(&lastWrite);
 
-    // Wait for op_done to be cleared
-    WaitOpDone("write", q, false);
+    // No longer waiting for op_done to be cleared, because this
+    // check has been moved to beginning (as a precondition)
+    // WaitOpDone("write", q, false);
 
     // Set all lines to 0
     RegisterWrite(Reg_OutputUpper, 0);

@@ -1,22 +1,10 @@
 
 ############################ Platform #############################
 
-if (BUILD_FPGAV30)
-  set (PLATFORM_STANDALONE "FpgaV30Standalone")
-else (BUILD_FPGAV30)
-  set (PLATFORM_STANDALONE "FpgaV31Standalone")
-endif (BUILD_FPGAV30)
-
-# Vitis 2022.x uses lwip211. Vitis 2023.1 uses lwip213.
-if (Vitis_VERSION_MAJOR EQUAL 2022)
-  set (LWIP_LIB "lwip211")
-else ()
-  set (LWIP_LIB "lwip213")
-endif ()
-
 # Libraries to include (xilffs required for fsbl, lwip for echo)
-set (BSP_LIBRARIES "xilffs" "xilrsa" ${LWIP_LIB})
-
+# Note that vitis_platform_create will find the correct library
+# name for "lwip*" (e.g., "lwip211", "lwip213", "lwip220")
+set (BSP_LIBRARIES "xilffs" "xilrsa" "lwip*")
 
 vitis_platform_create(
     PLATFORM_NAME     ${PLATFORM_STANDALONE}
@@ -30,6 +18,15 @@ vitis_platform_create(
 
 set (FPGAV3LIB_NAME   "fpgav3")
 set (FPGAV3LIB_TARGET "${FPGAV3LIB_NAME}lib")
+
+
+# Note that fpgav3_qspi.h and fpgsv3_qspi.c are in this directory,
+# but are not included in FPGAV3LIB_SOURCE because they rely on
+# qspi.h and qspi.c, which are provided by the "Zynq FSBL" template.
+# Thus, the FSBL applications include them directly.
+set (FPGAV3_QSPI_SOURCE
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_qspi.h"
+     "${CMAKE_CURRENT_SOURCE_DIR}/fpgav3_lib_src/fpgav3_qspi.c")
 
 # Additional source files
 set (FPGAV3LIB_SOURCE
@@ -53,7 +50,8 @@ set (FSBL_CONFIG "Release")
 
 # Additional source files
 set (FSBL_SOURCE
-     "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/fsbl_src/fsbl_hooks.c"
+     ${FPGAV3_QSPI_SOURCE})
 
 vitis_create (APP
     APP_NAME       ${FSBL_NAME}
@@ -67,7 +65,7 @@ get_property(FSBL_OUTPUT TARGET ${FSBL_NAME} PROPERTY OUTPUT_NAME)
 
 ########################## MFG_TEST App ############################
 
-set (MFG_TEST_NAME   "mfg_test")
+set (MFG_TEST_NAME   ${VITIS_MFG_TARGET})
 set (MFG_TEST_CONFIG "Release")
 
 # Additional source files
@@ -76,7 +74,8 @@ set (MFG_TEST_SOURCE
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/menu.c"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/testDefines.h"
      "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/memtest.c"
-     "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c")
+     "${CMAKE_CURRENT_SOURCE_DIR}/mfg_test_src/xqspips_selftest_example.c"
+     ${FPGAV3_QSPI_SOURCE})
 
 vitis_create (APP
     APP_NAME       ${MFG_TEST_NAME}

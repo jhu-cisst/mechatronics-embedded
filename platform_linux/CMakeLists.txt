@@ -1,12 +1,6 @@
 
 ############################ Platform #############################
 
-if (BUILD_FPGAV30)
-  set (PLATFORM_LINUX      "FpgaV30Linux")
-else (BUILD_FPGAV30)
-  set (PLATFORM_LINUX      "FpgaV31Linux")
-endif (BUILD_FPGAV30)
-
 set (PLATFORM_LINUX_DEPS ${BLOCK_DESIGN_NAME})
 
 if (USE_PETALINUX_SYSROOT)
@@ -14,7 +8,10 @@ if (USE_PETALINUX_SYSROOT)
   if (BUILD_PETALINUX_SYSROOT)
     set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
                              ${PETALINUX_SDK_TARGET})
-  endif()
+  else ()
+    set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
+                             sysroot_external)
+  endif ()
 
   vitis_platform_create(
       PLATFORM_NAME     ${PLATFORM_LINUX}
@@ -58,41 +55,23 @@ if (USE_PETALINUX_SYSROOT)
                         ${FPGAV3_VERSION_HEADER})
 
 
-  if (BUILD_PETALINUX_SYSROOT)
-
-    vitis_create (LIBRARY
-        TARGET_NAME    ${LIBFPGAV3_TARGET}
-        LIB_NAME       ${LIBFPGAV3_NAME}
-        PLATFORM_NAME  ${PLATFORM_LINUX}
-        LIB_TYPE       "shared"
-        LANGUAGE       "c++"
-        ADD_SOURCE     ${LIBFPGAV3_SOURCE}
-        LIBRARIES      "gpiod"
-        BUILD_CONFIG   "Release"
-        DEPENDENCIES   ${PETALINUX_SDK_TARGET} FpgaVersionFile)
-
-    # Probably do not need to build libfpgav3 standalone when also building Petalinux
-    set_target_properties(${LIBFPGAV3_TARGET} PROPERTIES EXCLUDE_FROM_ALL ON)
-
-  else ()
-
-    vitis_create (LIBRARY
-        TARGET_NAME    ${LIBFPGAV3_TARGET}
-        LIB_NAME       ${LIBFPGAV3_NAME}
-        PLATFORM_NAME  ${PLATFORM_LINUX}
-        LIB_TYPE       "shared"
-        LANGUAGE       "c++"
-        ADD_SOURCE     ${LIBFPGAV3_SOURCE}
-        LIBRARIES      "gpiod"
-        BUILD_CONFIG   "Release"
-        DEPENDENCIES   FpgaVersionFile)
-
-  endif ()
+  vitis_create (LIBRARY
+      TARGET_NAME    ${LIBFPGAV3_TARGET}
+      LIB_NAME       ${LIBFPGAV3_NAME}
+      PLATFORM_NAME  ${PLATFORM_LINUX}
+      LIB_TYPE       "shared"
+      LANGUAGE       "c++"
+      ADD_SOURCE     ${LIBFPGAV3_SOURCE}
+      LIBRARIES      "gpiod"
+      BUILD_CONFIG   "Release"
+      DEPENDENCIES   FpgaVersionFile)
 
   get_property(LIBFPGAV3_OUTPUT TARGET ${LIBFPGAV3_TARGET} PROPERTY OUTPUT_NAME)
 
+elseif (NOT BUILD_PETALINUX_SYSROOT)
 
-else ()
+  # USE_PETALINUX_SYSROOT is OFF when BUILD_PETALINUX_SYSROOT is ON, so no need to
+  # to display a message
 
   message (STATUS "Skipping libfpgav3 Vitis build (USE_PETALINUX_SYSROOT not set)")
 
@@ -110,40 +89,23 @@ if (USE_PETALINUX_SYSROOT)
   # Additional source files
   set (FPGAV3INIT_SOURCE "${CMAKE_SOURCE_DIR}/petalinux/fpgav3init/files/fpgav3init.cpp")
 
-  if (BUILD_PETALINUX_SYSROOT)
-
-    vitis_create (APP
-        TARGET_NAME    ${FPGAV3INIT_TARGET}
-        APP_NAME       ${FPGAV3INIT_NAME}
-        PLATFORM_NAME  ${PLATFORM_LINUX}
-        TEMPLATE_NAME  "Empty Application (C++)"
-        LANGUAGE       "c++"
-        ADD_SOURCE     ${FPGAV3INIT_SOURCE}
-        LIBRARIES      "fpgav3"
-        BUILD_CONFIG   "Release"
-        DEPENDENCIES   ${PETALINUX_SDK_TARGET} ${LIBFPGAV3_TARGET})
-
-    # Probably do not need to build fpgav3init standalone when also building Petalinux
-    set_target_properties(${FPGAV3INIT_TARGET} PROPERTIES EXCLUDE_FROM_ALL ON)
-
-  else ()
-
-    vitis_create (APP
-        TARGET_NAME    ${FPGAV3INIT_TARGET}
-        APP_NAME       ${FPGAV3INIT_NAME}
-        PLATFORM_NAME  ${PLATFORM_LINUX}
-        TEMPLATE_NAME  "Empty Application (C++)"
-        LANGUAGE       "c++"
-        ADD_SOURCE     ${FPGAV3INIT_SOURCE}
-        LIBRARIES      "fpgav3"
-        BUILD_CONFIG   "Release"
-        DEPENDENCIES   ${LIBFPGAV3_TARGET})
-
-  endif ()
+  vitis_create (APP
+      TARGET_NAME    ${FPGAV3INIT_TARGET}
+      APP_NAME       ${FPGAV3INIT_NAME}
+      PLATFORM_NAME  ${PLATFORM_LINUX}
+      TEMPLATE_NAME  "Empty Application (C++)"
+      LANGUAGE       "c++"
+      ADD_SOURCE     ${FPGAV3INIT_SOURCE}
+      LIBRARIES      "fpgav3"
+      BUILD_CONFIG   "Release"
+      DEPENDENCIES   ${LIBFPGAV3_TARGET})
 
   get_property(FPGAV3INIT_OUTPUT TARGET ${FPGAV3INIT_TARGET} PROPERTY OUTPUT_NAME)
 
-else ()
+elseif (NOT BUILD_PETALINUX_SYSROOT)
+
+  # USE_PETALINUX_SYSROOT is OFF when BUILD_PETALINUX_SYSROOT is ON, so no need to
+  # to display a message
 
   message (STATUS "Skipping fpgav3init Vitis build (USE_PETALINUX_SYSROOT not set)")
 
