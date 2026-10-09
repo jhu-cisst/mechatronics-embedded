@@ -407,11 +407,11 @@ function (vitis_create OBJECT_TYPE ...)
     foreach (src ${ADD_SOURCE})
       file (APPEND ${TCL_BUILD} "importsources -name ${OBJECT_NAME} -path ${src}\n")
     endforeach (src)
-    # Remove the output file to force a rebuild. This is needed because although CMake correctly
-    # handles the dependency on TARGET_LIBS, it seems that XSCT does not re-link the app executable
-    # after the library has been updated. A more drastic solution would be to call "app clean".
-    # file (APPEND ${TCL_BUILD} "${XSCT_CMD} clean -name ${OBJECT_NAME}\n")
-    file (APPEND ${TCL_BUILD} "file delete ${OBJECT_OUTPUT}\n")
+    # Clean the app to force a rebuild. Previously, this was done by removing the output file (see
+    # commented out line below), but given the frequent version file updates (using git), this
+    # is more robust.
+    # file (APPEND ${TCL_BUILD} "file delete ${OBJECT_OUTPUT}\n")
+    file (APPEND ${TCL_BUILD} "${XSCT_CMD} clean -name ${OBJECT_NAME}\n")
     # Compile app or library
     file (APPEND ${TCL_BUILD} "${XSCT_CMD} build -name ${OBJECT_NAME}\n")
 
