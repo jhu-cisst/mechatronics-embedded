@@ -9,7 +9,7 @@ project(FpgaBoard NONE)
 # The designated version; note that this may be different from the version indicated by git (see below)
 set (EMBEDDED_VERSION_MAJOR 1)
 set (EMBEDDED_VERSION_MINOR 2)
-set (EMBEDDED_VERSION_PATCH 0)
+set (EMBEDDED_VERSION_PATCH 1)
 set (EMBEDDED_VERSION "${EMBEDDED_VERSION_MAJOR}.${EMBEDDED_VERSION_MINOR}.${EMBEDDED_VERSION_PATCH}")
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

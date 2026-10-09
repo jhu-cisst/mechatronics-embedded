@@ -47,7 +47,10 @@ set (LIBFPGAV3_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/files/fpgav3_emio.
 
 set (LIBFPGAV3_BB      "${CMAKE_CURRENT_SOURCE_DIR}/libfpgav3/libfpgav3.bb")
 
-petalinux_app_create (APP_NAME       "libfpgav3"
+set (LIBFPGAV3_TARGET  "libfpgav3")
+
+# petalinux_app_create uses APP_NAME as TARGET_NAME if latter not specified
+petalinux_app_create (APP_NAME       ${LIBFPGAV3_TARGET}
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${LIBFPGAV3_SOURCES}
                       APP_TEMPLATE   "c++"
@@ -66,7 +69,8 @@ petalinux_app_create (APP_NAME       "fpgav3init"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3INIT_SOURCES}
                       APP_TEMPLATE   "c++"
-                      APP_BB         ${FPGAV3INIT_BBAPPEND})
+                      APP_BB         ${FPGAV3INIT_BBAPPEND}
+                      DEPENDENCIES   ${LIBFPGAV3_TARGET})
 
 # ************************** fpgav3sn app ********************************
 
@@ -78,7 +82,8 @@ petalinux_app_create (APP_NAME       "fpgav3sn"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3SN_SOURCES}
                       APP_TEMPLATE   "c++"
-                      APP_BB         ${FPGAV3SN_BBAPPEND})
+                      APP_BB         ${FPGAV3SN_BBAPPEND}
+                      DEPENDENCIES   ${LIBFPGAV3_TARGET})
 
 # ************************** fpgav3block app *******************************
 
@@ -90,7 +95,8 @@ petalinux_app_create (APP_NAME       "fpgav3block"
                       PROJ_NAME      ${PETALINUX_PROJ_NAME}
                       APP_SOURCES    ${FPGAV3BLOCK_SOURCES}
                       APP_TEMPLATE   "c++"
-                      APP_BB         ${FPGAV3BLOCK_BBAPPEND})
+                      APP_BB         ${FPGAV3BLOCK_BBAPPEND}
+                      DEPENDENCIES   ${LIBFPGAV3_TARGET})
 
 # ************************** Petalinux build *******************************
 

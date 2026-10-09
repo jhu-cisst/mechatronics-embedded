@@ -339,7 +339,29 @@ bool CopyQspiToFpga(const std::string &qspiDev, EMIO_Interface *emio, uint16_t n
 
 int main(int argc, char **argv)
 {
-    std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
+    // Bitmask for current mode.
+    //   MODE_QUERY (0):    no bit set, means to just query and display information
+    //   MODE_PROGRAM (1):  bit set means to program FPGA and initialize FPGA registers
+    //   MODE_INIT (2):     bit set indicates initialization (at startup)
+    enum { MODE_QUERY=0, MODE_PROGRAM=1, MODE_INIT=2 };
+    int mode = MODE_QUERY;
+
+    if (argc > 1) {
+        if (strcmp(argv[1], "start") == 0) {
+            // The "start" parameter is passed during startup (see fpgav3init.bbappend)
+            std::cout << "*** FPGAV3 Initialization ***" << std::endl << std::endl;
+            mode = MODE_PROGRAM | MODE_INIT;
+        }
+        else if ((argv[1][0] == '-') && (argv[1][1] == 'r')) {
+            std::cout << "Reloading firmware" << std::endl;
+            mode = MODE_PROGRAM;
+        }
+        else {
+            std::cout << "Usage:  fpgav3init [-r]" << std::endl
+                      << "   -r to reload firmware" << std::endl;
+            return 0;
+        }
+    }
 
     // Display software versions
     print_fpgav3_versions(std::cout);
@@ -357,7 +379,6 @@ int main(int argc, char **argv)
         return -1;
 
     emio.ReadQuadlet(4, reg_hw);
-    emio.ReadQuadlet(0, reg_status);
 
     char hwStr[5];
     hwStr[0] = (reg_hw & 0xff000000) >> 24;
@@ -365,79 +386,96 @@ int main(int argc, char **argv)
     hwStr[2] = (reg_hw & 0x0000ff00) >> 8;
     hwStr[3] = (reg_hw & 0x000000ff);
     hwStr[4] = 0;
-    if (strcmp(hwStr, "BCFG") != 0) {
-        std::cout << "fpgav3init: did not detect BCFG firmware, exiting" << std::endl;
-        return -1;
-    }
     std::cout << "Hardware version: " << hwStr << std::endl;
-    std::cout << "Status reg: " << std::hex << std::setw(8) << std::setfill('0')
-              << reg_status << std::dec << std::endl;
+
+    emio.ReadQuadlet(0, reg_status);
     unsigned int board_id = (reg_status&0x0f000000)>>24;
-    // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST
-    unsigned int board_mask = (reg_status & 0x00f00000)>>20;
-    // check for TEST board
-    if (reg_status & 0x00002000) board_mask |= 0x10;
-    bool isV30 = (reg_status&0x00080000);
+    std::cout << "Board ID: " << board_id << std::endl << std::endl;
 
-    if (isV30)
-        std::cout << "FPGA V3.0 detected!" << std::endl;
+    enum BoardType board_type = BOARD_UNKNOWN;
 
-    enum BoardType board_type;
-    switch (board_mask) {
-        case 0x10: board_type = BOARD_TEST;
-                   break;
-        case 0x08: board_type = BOARD_NONE;
-                   break;
-        case 0x04: board_type = BOARD_QLA;
-                   break;
-        case 0x02: board_type = BOARD_DQLA;
-                   break;
-        case 0x01: board_type = BOARD_DRAC;
-                   break;
-        default:
-                board_type = BOARD_UNKNOWN;
+    if (mode & MODE_INIT) {
+        if (strcmp(hwStr, "BCFG") != 0) {
+            std::cout << "fpgav3init: did not detect BCFG firmware, exiting" << std::endl;
+            return -1;
+        }
+
+        std::cout << "Status reg: " << std::hex << std::setw(8) << std::setfill('0')
+                  << reg_status << std::dec << std::endl;
+        // board_type bitmask: BOARD_NONE, BOARD_QLA, BOARD_DQLA, BOARD_DRAC, BOARD_TEST
+        unsigned int board_mask = (reg_status & 0x00f00000)>>20;
+        // check for TEST board
+        if (reg_status & 0x00002000) board_mask |= 0x10;
+        bool isV30 = (reg_status&0x00080000);
+
+        if (isV30)
+            std::cout << "FPGA V3.0 detected!" << std::endl;
+
+        switch (board_mask) {
+            case 0x10: board_type = BOARD_TEST;
+                       break;
+            case 0x08: board_type = BOARD_NONE;
+                       break;
+            case 0x04: board_type = BOARD_QLA;
+                       break;
+            case 0x02: board_type = BOARD_DQLA;
+                       break;
+            case 0x01: board_type = BOARD_DRAC;
+                       break;
+            default:
+                    board_type = BOARD_UNKNOWN;
+        }
+        std::cout << "Exporting FPGAV3 environment variables" << std::endl;
+        char fpga_ver[4];
+        fpga_ver[0] = '3';
+        fpga_ver[1] = '.';
+        fpga_ver[2] = isV30 ? '0' : '1';
+        fpga_ver[3] = '\0';
+        ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type].c_str(), board_id);
+    }
+    else {
+        if (strcmp(hwStr, "QLA1") == 0)
+            board_type = BOARD_QLA;
+        else if (strcmp(hwStr, "DQLA") == 0)
+            board_type = BOARD_DQLA;
+        else if (strcmp(hwStr, "dRA1") == 0)
+            board_type = BOARD_DRAC;
     }
     std::cout << "Board type: " << BoardName[board_type] << std::endl;
 
-    std::cout << "Board ID: " << board_id << std::endl << std::endl;
+    if (mode & MODE_PROGRAM) {
 
-    std::cout << "Exporting FPGAV3 environment variables" << std::endl;
-    char fpga_ver[4];
-    fpga_ver[0] = '3';
-    fpga_ver[1] = '.';
-    fpga_ver[2] = isV30 ? '0' : '1';
-    fpga_ver[3] = '\0';
-    ExportFpgaInfo(fpga_ver, fpga_sn, BoardName[board_type].c_str(), board_id);
+        // MicroSD card should be auto-mounted
+        if (!FirmwareName[board_type].empty())
+            ProgramFpga(FirmwareName[board_type]);
 
-    // MicroSD card should be auto-mounted
+        std::cout << std::endl << "Enabling PS Ethernet" << std::endl;
+        // Bit 25: mask for PS Ethernet enable
+        // Bit 16: enable PS eth (Rev 9)
+        // Removed support for Rev 8 (bits 8, 0)
+        reg_ethctrl = 0x02010000;
+        emio.WriteQuadlet(12, reg_ethctrl);
 
-    if (!FirmwareName[board_type].empty())
-        ProgramFpga(FirmwareName[board_type]);
+        // Copy first 16 bytes (i.e., FPGA S/N)
+        // from QSPI flash to FPGA registers
+        std::cout << "Writing FPGA S/N to FPGA" << std::endl << std::endl;
+        CopyQspiToFpga("/dev/mtd4ro", &emio, 16);
+    }
 
-    ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
+    if (mode & MODE_INIT) {
+        std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
+        if (!SetMACandIP("eth0", board_id))
+            std::cout << "Failed to set MAC or IP address for eth0" << std::endl;
 
-    std::cout << std::endl << "Enabling PS Ethernet" << std::endl;
-    // Bit 25: mask for PS Ethernet enable
-    // Bit 16: enable PS eth (Rev 9)
-    // Removed support for Rev 8 (bits 8, 0)
-    reg_ethctrl = 0x02010000;
-    emio.WriteQuadlet(12, reg_ethctrl);
+        // Configure avahi-daemon (zeroconf)
+        ConfigureAvahi(board_id, board_type);
 
-    std::cout << "Setting Ethernet MAC and IP addresses" << std::endl;
-    if (!SetMACandIP("eth0", board_id))
-        std::cout << "Failed to set MAC or IP address for eth0" << std::endl;
+        // Configure NTP
+        ConfigureNTP();
 
-    // Configure avahi-daemon (zeroconf)
-    ConfigureAvahi(board_id, board_type);
+        ProgramFlash("/media/qspi-boot.bin", "/dev/mtd0");
+        std::cout << "*** FPGAV3 Initialization Complete ***" << std::endl << std::endl;
+    }
 
-    // Configure NTP
-    ConfigureNTP();
-
-    // Copy first 16 bytes (i.e., FPGA S/N)
-    // from QSPI flash to FPGA registers
-    std::cout << "Writing FPGA S/N to FPGA" << std::endl << std::endl;
-    CopyQspiToFpga("/dev/mtd4ro", &emio, 16);
-
-    std::cout << "*** FPGAV3 Initialization Complete ***" << std::endl << std::endl;
     return 0;
 }

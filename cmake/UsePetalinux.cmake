@@ -55,6 +55,7 @@
 #   - APP_TEMPLATE       Application template (c, c++, autoconf, fpgamanager, install)
 #   - APP_SOURCES        List of source files
 #   - APP_BB             Application bb or bbappend file (optional)
+#   - DEPENDENCIES       Additional dependencies
 #
 # Description:
 #   This function creates the application and then overwrites it with the specified
@@ -294,14 +295,10 @@ function (petalinux_create ...)
       foreach (src ${RECIPES_CORE_SRC})
         set (src_file   "${RECIPES_CORE_DIR}/${src}")
         set (dest_file  "${RECIPES_CORE_BIN_DIR}/${src}")
-        # Remove configure_file when CMake minimum increased to 3.21 or higher
-        if (CMAKE_VERSION VERSION_LESS 3.21)
-          file (APPEND ${CMAKE_COPY_RECIPES} "configure_file ( ${src_file}\n")
-          file (APPEND ${CMAKE_COPY_RECIPES} "                 ${dest_file}  COPYONLY)\n")
-        else ()
-          file (APPEND ${CMAKE_COPY_RECIPES} "file (COPY_FILE ${src_file}\n")
-          file (APPEND ${CMAKE_COPY_RECIPES} "                ${dest_file}  ONLY_IF_DIFFERENT)\n")
-        endif ()
+        # CMake 3.21+ has file(COPY_FILE ... ONLY_IF_DIFFERENT), but this does not create
+	# subdirectories if needed, thus we instead use configure_file.
+        file (APPEND ${CMAKE_COPY_RECIPES} "configure_file ( ${src_file}\n")
+        file (APPEND ${CMAKE_COPY_RECIPES} "                 ${dest_file}  COPYONLY)\n")
         set (RECIPES_CORE_SRC_FULL ${RECIPES_CORE_SRC_FULL} ${src_file})
       endforeach (src)
     endif ()
@@ -374,7 +371,8 @@ function (petalinux_app_create ...)
        PROJ_NAME
        APP_TEMPLATE
        APP_SOURCES
-       APP_BB)
+       APP_BB
+       DEPENDENCIES)
 
   # reset local variables
   foreach(keyword ${FUNCTION_KEYWORDS})
@@ -448,12 +446,14 @@ function (petalinux_app_create ...)
                 ARGS -E ${APP_BB_CMD}
                 ${APP_BB}
                 ${APP_BIN}
+        # Clean the build tree
+        COMMAND petalinux-build -p ${PROJ_NAME} -c ${APP_NAME} -x cleansstate
         COMMENT "Creating ${TARGET_NAME}"
         DEPENDS ${PROJ_NAME} ${PETALINUX_CONFIG_OUTPUT} ${APP_SOURCES} ${APP_BB})
 
     add_custom_target (${TARGET_NAME} ALL
                        COMMENT "Checking creation of ${APP_NAME} app"
-                       DEPENDS ${APP_CREATE_OUTPUT})
+                       DEPENDS ${APP_CREATE_OUTPUT} ${DEPENDENCIES})
 
     set_property(TARGET ${TARGET_NAME}
                         PROPERTY OUTPUT_NAME ${APP_CREATE_OUTPUT})
