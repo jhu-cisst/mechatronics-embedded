@@ -233,9 +233,8 @@ if (USE_VITIS)
 
       if (HW_XSA_FILE)
         add_subdirectory (platform_standalone)
-        add_subdirectory (platform_linux)
       else ()
-        message (WARNING "Cannot build standalone and linux platforms (Find Vivado or specify HW_XSA_FILE)")
+        message (WARNING "Cannot build standalone platform (Find Vivado or specify HW_XSA_FILE)")
       endif ()
 
     endif ()
@@ -281,6 +280,15 @@ if (USE_PETALINUX)
 
   endif ()
 
+endif ()
+
+# Configure platform_linux last because it has a dependency on the Petalinux SDK
+if (Vitis_FOUND)
+  if (HW_XSA_FILE)
+    add_subdirectory (platform_linux)
+  else ()
+    message (WARNING "Cannot build linux platform (Find Vivado or specify HW_XSA_FILE)")
+  endif ()
 endif ()
 
 #

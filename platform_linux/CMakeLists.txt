@@ -6,8 +6,11 @@ set (PLATFORM_LINUX_DEPS ${BLOCK_DESIGN_NAME})
 if (USE_PETALINUX_SYSROOT)
 
   if (BUILD_PETALINUX_SYSROOT)
+    get_property(sdk_file TARGET ${PETALINUX_SDK_TARGET}
+                          PROPERTY OUTPUT_NAME)
     set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
-                             ${PETALINUX_SDK_TARGET})
+                             ${PETALINUX_SDK_TARGET}
+                             ${sdk_file})
   else ()
     set (PLATFORM_LINUX_DEPS ${PLATFORM_LINUX_DEPS}
                              sysroot_external)
