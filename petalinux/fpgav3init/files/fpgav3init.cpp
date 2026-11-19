@@ -188,6 +188,24 @@ bool ExportFpgaInfo(const char *fpga_ver, const char *fpga_sn, const char *board
         sprintf(buf, "export FPGAV3_ID=%d\n", board_id);
         write(fd, buf, strlen(buf)+1);
     }
+    // Now, set PATH and LD_LIBRARY_PATH to include directories in /media.
+    // Currently, they are added at the end of PATH and LD_LIBRARY_PATH, so files in
+    // these directories will not supersede system files, but this could be changed.
+    // Here, we assume that PATH is not empty.
+    strcpy(buf, "export PATH=\"$PATH:/media/bin\"\n");
+    write(fd, buf, strlen(buf)+1);
+    // Currently, LD_LIBRARY_PATH is not set (empty), but we handle the case
+    // where it is set to avoid potential problems in the future.
+    strcpy(buf, "if [ -z \"$LD_LIBRARY_PATH\" ]; then\n");
+    write(fd, buf, strlen(buf)+1);
+    strcpy(buf, "    export LD_LIBRARY_PATH=/media/lib\n");
+    write(fd, buf, strlen(buf)+1);
+    strcpy(buf, "else\n");
+    write(fd, buf, strlen(buf)+1);
+    strcpy(buf, "    export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH:/media/lib\"\n");
+    write(fd, buf, strlen(buf)+1);
+    strcpy(buf, "fi\n");
+    write(fd, buf, strlen(buf)+1);
     close(fd);
     return true;
 }
